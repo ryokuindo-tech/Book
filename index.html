@@ -1733,12 +1733,10 @@ body {
             document.getElementById('scanner-modal').classList.remove('hidden');
 
             html5QrcodeScanner = new Html5Qrcode("reader");
-            const config = { fps: 10, qrbox: { width: 250, height: 100 } };
+            const config = { fps: 10, qrbox: { width: 250, height: 70 } };
 
             html5QrcodeScanner.start(
-                { width: { ideal: 1280 }, 
-                    height: { ideal: 720 }, 
-                    facingMode: "environment" }, 
+                { facingMode: "environment" }, 
                 config, 
                 (decodedText) => {
                     html5QrcodeScanner.stop().then(() => {
