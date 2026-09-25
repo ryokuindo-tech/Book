@@ -1,0 +1,1989 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>書籍・在庫管理 Webシステム（年別・月別集計機能付き）</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- JsBarcode for barcode output -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <!-- Html5-Qrcode for camera scanning -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+
+    <style>
+       @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700&display=swap');
+body {
+    font-family: 'M PLUS Rounded 1c', sans-serif;
+}
+        
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #print-label-area, #print-label-area * {
+                visibility: visible;
+            }
+            #print-label-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+        }
+
+        .modal-backdrop {
+            background-color: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(4px);
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        #inventory-table-body td, 
+        table th {
+            padding-top: 4px !important;
+            padding-bottom: 4px !important;
+        }
+        #inventory-table-body td div + div {
+            margin-top: 2px !important;
+        }
+        #inventory-table-body td {
+            line-height: 1.5 !important;
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- Header Navigation -->
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-indigo-600 p-2.5 rounded-xl text-white shadow-inner">
+                    <i class="fa-solid fa-book-bookmark text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight">書籍・在庫管理 Webシステム</h1>
+                    <p class="text-xs text-slate-400">Excel連動・粗利自動算定・月別集計対応</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <button onclick="openBarcodeScannerModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-xl text-sm font-medium flex items-center space-x-2 transition shadow">
+                    <i class="fa-solid fa-barcode"></i>
+                    <span class="hidden sm:inline">スキャン検索/取得</span>
+                </button>
+                <button onclick="openBookModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-sm font-medium flex items-center space-x-2 transition shadow">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>新規書籍追加</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Summary Metrics Card -->
+        <section class="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center space-x-4">
+                <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                    <i class="fa-solid fa-boxes-stacked text-2xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase">総在庫数</p>
+                    <p id="stat-total-stock" class="text-2xl font-bold text-slate-800">0 <span class="text-xs font-normal text-slate-500">冊</span></p>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center space-x-4">
+                <div class="p-3 bg-amber-50 text-amber-600 rounded-xl">
+                    <i class="fa-solid fa-warehouse text-2xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase">総在庫金額</p>
+                    <p id="stat-stock-value" class="text-2xl font-bold text-slate-800">¥0</p>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center space-x-4">
+                <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+                    <i class="fa-solid fa-receipt text-2xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase">仕入合計 (税込)</p>
+                    <p id="stat-total-sales" class="text-2xl font-bold text-slate-800">¥0</p>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center space-x-4">
+                <div class="p-3 bg-teal-50 text-teal-600 rounded-xl">
+                    <i class="fa-solid fa-file-invoice-dollar text-2xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase">売上合計</p>
+                    <p id="stat-conditional-total-sales" class="text-2xl font-bold text-slate-800">¥0</p>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center space-x-4">
+                <div class="p-3 bg-purple-50 text-purple-600 rounded-xl">
+                    <i class="fa-solid fa-chart-pie text-2xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase">粗利益累計</p>
+                    <p id="stat-total-profit" class="text-2xl font-bold text-slate-800">¥0</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Search & Filter Area -->
+        <section class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="relative flex-1">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input type="text" id="search-input" oninput="renderTable()" placeholder="ID・書名・著者・出版社・ISBN・ISC・販売場所で検索..." class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <select id="filter-status" onchange="renderTable()" class="border border-slate-300 rounded-xl text-sm px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="">ステータス: すべて</option>
+                        <option value="販売中">販売中</option>
+                        <option value="SoldOut">SoldOut</option>
+                        <option value="廃棄">廃棄</option>
+                        <option value="保留">保留</option>
+                    </select>
+
+                    <select id="filter-location" onchange="renderTable()" class="border border-slate-300 rounded-xl text-sm px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="">販売場所: すべて</option>
+                        <option value="店舗（新本）">店舗（新本）</option>
+                        <option value="店舗（古本）">店舗（古本）</option>
+                        <option value="ストアーズ（新本）">ストアーズ（新本）</option>
+                        <option value="ストアーズ（古本）">ストアーズ（古本）</option>
+                        <option value="ストアーズ（新本P）">ストアーズ（新本P）</option>
+                        <option value="ストアーズ（BB）">ストアーズ（BB）</option>
+                        <option value="イベント（新本）">イベント（新本）</option>
+                        <option value="イベント（古本）">イベント（古本）</option>
+                        <option value="イベント（新本P）">イベント（新本P）</option>
+                        <option value="イベント（BB）">イベント（BB）</option>
+                    </select>
+
+                    <button onclick="exportCSV()" class="border border-slate-300 hover:bg-slate-50 text-slate-700 px-3.5 py-2 rounded-xl text-sm font-medium flex items-center space-x-1.5 transition">
+                        <i class="fa-solid fa-file-csv text-emerald-600 text-base"></i>
+                        <span>CSV書き出し</span>
+                    </button>
+
+                    <label class="border border-slate-300 hover:bg-slate-50 text-slate-700 px-3.5 py-2 rounded-xl text-sm font-medium flex items-center space-x-1.5 cursor-pointer transition">
+                        <i class="fa-solid fa-file-import text-blue-600 text-base"></i>
+                        <span>CSV読み込み</span>
+                        <input type="file" id="csv-file-input" accept=".csv" onchange="importCSV(event)" class="hidden">
+                    </label>
+                    <button onclick="saveToGoogleSheets()" class="bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-2 rounded-xl text-sm font-medium flex items-center space-x-2 transition shadow">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <span>スプレッドシートへ保存</span>
+                    </button>
+                    <a href="report.html" class="bg-slate-800 hover:bg-slate-700 text-white px-3.5 py-2 rounded-xl text-sm font-medium flex items-center space-x-2 transition shadow">
+                        <i class="fa-solid fa-chart-line"></i>
+                        <span class="hidden sm:inline">収益レポート別ページ</span>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- 年別・月別 売上・原価・利益レポートセクション（アコーディオン対応） -->
+        <section class="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+                <div class="flex items-center space-x-2.5">
+                    <div class="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                        <i class="fa-solid fa-chart-line text-lg"></i>
+                    </div>
+                    <h3 class="font-bold text-slate-800 text-base">年別・月別 売上・原価・利益レポート (クリックで月別開閉)</h3>
+                </div>
+                <span class="text-xs text-slate-400">※売上日記入かつ「SoldOut」のデータを基準に集計</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm border-collapse">
+                    <thead class="bg-slate-100 text-slate-600 uppercase text-xs font-semibold border-b border-slate-200">
+                        <tr>
+                            <th class="py-2.5 px-4">年月 / 年度合計</th>
+                            <th class="py-2.5 px-4 text-right">売上合計（税込）</th>
+                            <th class="py-2.5 px-4 text-right">売上原価（仕入合計）</th>
+                            <th class="py-2.5 px-4 text-right">利益（粗利）</th>
+                            <th class="py-2.5 px-4 text-center">売上数</th>
+                        </tr>
+                    </thead>
+                    <tbody id="summary-table-body" class="divide-y divide-slate-200 text-slate-700">
+                        <!-- 動的挿入 -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Inventory Table -->
+        <section class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm border-collapse">
+                    <thead class="bg-slate-100 text-slate-600 uppercase text-xs font-semibold border-b border-slate-200">
+                        <tr>
+                            <th class="py-2 px-4 cursor-pointer hover:bg-slate-200 transition select-none" onclick="toggleIdSort()">
+                                ID / 販売場所 <i id="id-sort-icon" class="fa-solid fa-sort text-slate-400 ml-1"></i>
+                            </th>
+                            <th class="py-2 px-4">書名 / 著者</th>
+                            <th class="py-2 px-4">出版社 / ISBN / ISC</th>
+                            <th class="py-2 px-4 text-center">ステータス</th>
+                            <th class="py-2 px-4 text-center">売上数</th>
+                            <th class="py-2 px-2 w-15">在庫</th>
+                            <th class="py-2 px-4">仕入合計（税込）</th>
+                            <th class="py-2 px-4">売上合計（税込）</th>
+                            <th class="py-2 px-4 text-center">粗利益</th>
+                            <th class="py-2 px-4 text-center">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventory-table-body" class="divide-y divide-slate-200 text-slate-700">
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="empty-state" class="hidden py-16 text-center text-slate-400">
+                <i class="fa-solid fa-book-open text-5xl mb-3 text-slate-300"></i>
+                <p class="text-base font-semibold">該当する書籍データがありません</p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal Form (Single Scrollable Page) -->
+    <div id="book-modal" class="fixed inset-0 modal-backdrop z-50 hidden flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden">
+            
+            <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
+                <div class="flex items-center space-x-2.5">
+                    <i class="fa-solid fa-pen-to-square text-indigo-400 text-lg"></i>
+                    <h3 id="modal-title" class="text-lg font-bold">書籍情報の登録・編集</h3>
+                </div>
+                <button onclick="closeBookModal()" class="text-slate-400 hover:text-white transition p-1 rounded-lg">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <!-- ISBN Lookup Control -->
+            <div class="bg-indigo-50/80 border-b border-indigo-100 px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+                <div class="flex items-center space-x-2 text-indigo-900 text-xs font-semibold">
+                    <i class="fa-solid fa-wand-magic-sparkles text-indigo-600 text-sm"></i>
+                    <span>ISBN自動取得 (OpenBD / 国立国会図書館 / Google Books):</span>
+                </div>
+                <div class="flex items-center space-x-2 w-full sm:w-auto">
+                    <input type="text" id="isbn-lookup-input" placeholder="ISBN (例: 9784000000000)" class="px-3 py-1.5 border border-indigo-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 flex-1 sm:w-64 font-mono">
+                    <button onclick="fetchBookInfoByISBN()" type="button" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg text-sm font-medium transition flex items-center space-x-1 shadow-sm shrink-0">
+                        <i class="fa-solid fa-download"></i>
+                        <span>自動検索</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Single Scrollable Form -->
+            <form id="book-form" onsubmit="saveBook(event)" class="p-6 overflow-y-auto flex-1 space-y-6">
+                <input type="hidden" id="field-editing-index">
+
+                <!-- SECTION 1: 基本・書誌情報 -->
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                    <h4 class="text-sm font-bold text-slate-800 flex items-center space-x-2 border-b border-slate-200 pb-2">
+                        <i class="fa-solid fa-circle-info text-indigo-600"></i>
+                        <span>① 基本・書誌情報</span>
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">ID (自動連番) <span class="text-red-500">*</span></label>
+                            <input type="text" id="field-ID" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-100 font-mono font-bold" readonly>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">書名 <span class="text-red-500">*</span></label>
+                            <input type="text" id="field-書名" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">著者 <span class="text-indigo-600 font-normal">(カンマ自動除去)</span></label>
+                            <input type="text" id="field-著者" oninput="cleanAuthorInput(this)" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">出版社</label>
+                            <input type="text" id="field-出版社" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">ISBN</label>
+                            <input type="text" id="field-ISBN" placeholder="9784..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">
+                                ISC (インストアコード)
+                                <button type="button" onclick="regenerateISCByCondition()" class="text-indigo-600 hover:text-indigo-800 ml-1 text-[11px] underline font-normal">再生成</button>
+                            </label>
+                            <input type="text" id="field-ISC" placeholder="自動設定 (13桁)" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono font-semibold text-indigo-700 bg-indigo-50/50" readonly>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">発行年月 (YYYY/MM)</label>
+                            <input type="text" id="field-発行年" placeholder="2026/09" onchange="formatPubDateInput(this)" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                        <div class="hidden md:block"></div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">本体価格 (定価)</label>
+                            <input type="number" id="field-本体価格" min="0" oninput="calculateTaxFromListPrice()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">税込価格 (税込)</label>
+                            <input type="number" id="field-税込価格" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">消費税率 (%)</label>
+                            <input type="number" id="field-本体税率" min="0" step="0.1" value="10" oninput="calculateTaxFromListPrice()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white font-semibold text-slate-700">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 2: 仕入管理 -->
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                    <h4 class="text-sm font-bold text-slate-800 flex items-center space-x-2 border-b border-slate-200 pb-2">
+                        <i class="fa-solid fa-cart-shopping text-emerald-600"></i>
+                        <span>② 仕入管理</span>
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">仕入日</label>
+                            <input type="date" id="field-仕入日" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">仕入先</label>
+                            <input type="text" id="field-仕入先" placeholder="市場 / 個人買取 / 古書店" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">仕入時の状態 <span class="text-xs text-indigo-600 font-normal">(ISC自動連携)</span></label>
+                            <select id="field-仕入時の状態" onchange="regenerateISCByCondition()" class="w-full px-3 py-2 border border-indigo-300 rounded-lg text-sm bg-white font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500">
+                                <option value="新本">新本 (ISC: 20~)</option>
+                                <option value="バーゲンブック">バーゲンブック (ISC: 22~)</option>
+                                <option value="新本P">新本P (ISC: 21~)</option>
+                                <option value="古本">古本 (ISC: 21~)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">束親</label>
+                            <input type="text" id="field-束親" placeholder="セット管理ID" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">仕入数</label>
+                            <input type="number" id="field-仕入数" min="0" value="1" oninput="recalculateAllCalculatedFields()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                        <div class="hidden md:block"></div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">仕入値（税抜）</label>
+                            <input type="number" id="field-仕入値（税抜）" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 text-slate-600 rounded-lg text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">仕入値 <span class="text-amber-600 font-normal">(税込)</span></label>
+                            <input type="number" id="field-仕入値" min="0" value="0" oninput="recalculateAllCalculatedFields()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">消費税率 (%)</label>
+                            <input type="number" id="field-仕入税率" min="0" step="0.1" value="10" oninput="recalculateAllCalculatedFields()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white font-semibold text-slate-700">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">仕入送料（税抜）</label>
+                            <input type="number" id="field-仕入送料（税抜）" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 text-slate-600 rounded-lg text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">仕入送料（税込）</label>
+                            <input type="number" id="field-仕入送料" min="0" value="0" oninput="recalculateAllCalculatedFields()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">消費税率 (%)</label>
+                            <input type="number" id="field-仕入送料税率" min="0" step="0.1" value="10" oninput="recalculateAllCalculatedFields()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white font-semibold text-slate-700">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">仕入合計（税込）</label>
+                            <input type="number" id="field-仕入合計" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 font-semibold text-slate-700 rounded-lg text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">掛率 (%)</label>
+                            <input type="number" id="field-掛率" step="0.1" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 text-slate-600 rounded-lg text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 3: 在庫・販売 -->
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                    <h4 class="text-sm font-bold text-slate-800 flex items-center space-x-2 border-b border-slate-200 pb-2">
+                        <i class="fa-solid fa-store text-blue-600"></i>
+                        <span>③ 在庫・販売</span>
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">登録日</label>
+                            <input type="date" id="field-登録日" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">販売場所</label>
+                            <select id="field-販売場所" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                                <option value="店舗（新本）">店舗（新本）</option>
+                                <option value="店舗（古本）">店舗（古本）</option>
+                                <option value="ストアーズ（新本）">ストアーズ（新本）</option>
+                                <option value="ストアーズ（古本）">ストアーズ（古本）</option>
+                                <option value="ストアーズ（新本P）">ストアーズ（新本P）</option>
+                                <option value="ストアーズ（BB）">ストアーズ（BB）</option>
+                                <option value="イベント（新本）">イベント（新本）</option>
+                                <option value="イベント（古本）">イベント（古本）</option>
+                                <option value="イベント（新本P）">イベント（新本P）</option>
+                                <option value="イベント（BB）">イベント（BB）</option>
+                            </select>
+                        </div>
+                        <div class="hidden md:block"></div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">販売価格 (税抜)</label>
+                            <input type="number" id="field-販売価格（税抜）" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 text-slate-600 rounded-lg text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">販売価格 (税込)</label>
+                            <input type="number" id="field-販売価格" min="0" value="0" oninput="calculateSalesPriceTax()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">消費税率 (%)</label>
+                            <input type="number" id="field-販売税率" min="0" step="0.1" value="10" oninput="calculateSalesPriceTax()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white font-semibold text-slate-700">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">販売送料 (税抜)</label>
+                            <input type="number" id="field-販売送料（税抜）" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 text-slate-600 rounded-lg text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">販売送料 (税込) <span class="text-indigo-600 font-normal">(顧客徴収分)</span></label>
+                            <input type="number" id="field-販売送料" min="0" value="0" oninput="calculateSalesShippingTax()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">消費税率 (%)</label>
+                            <input type="number" id="field-販売送料税率" min="0" step="0.1" value="10" oninput="calculateSalesShippingTax()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white font-semibold text-slate-700">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">売上合計 <span class="text-indigo-600 font-normal">(税込)</span></label>
+                            <input type="number" id="field-売上合計" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 font-bold text-slate-800 rounded-lg text-sm">
+                        </div>
+                        <div class="hidden md:block"></div>
+                        <div class="hidden md:block"></div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">売上数</label>
+                            <input type="number" id="field-売上数" min="0" value="0" oninput="recalculateAllCalculatedFields()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">在庫数</label>
+                            <input type="number" id="field-在庫数" min="0" value="1" oninput="recalculateAllCalculatedFields()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">在庫金額 (自動)</label>
+                            <input type="number" id="field-在庫金額" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 font-semibold text-slate-700 rounded-lg text-sm">
+                        </div>                        
+                    </div>
+                </div>
+
+                <!-- SECTION 4: 発送・決済 -->
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                    <h4 class="text-sm font-bold text-slate-800 flex items-center space-x-2 border-b border-slate-200 pb-2">
+                        <i class="fa-solid fa-truck-fast text-amber-600"></i>
+                        <span>④ 発送・決済</span>
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">発送手段</label>
+                            <select id="field-発送手段" onchange="updateShippingFee()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                                <option value="">選択してください</option>
+                                <option value="日本郵便（クリックポスト）">日本郵便（クリックポスト）</option>
+                                <option value="日本郵便（レターパックライト）">日本郵便（レターパックライト）</option>
+                                <option value="日本郵便（レターパックプラス）">日本郵便（レターパックプラス）</option>
+                                <option value="日本郵便（レターパックプラスまとめ）">日本郵便（レターパックプラスまとめ）</option>
+                                <option value="ゆうパック（北海道60）">ゆうパック（北海道60）</option>
+                                <option value="ゆうパック（北海道80）">ゆうパック（北海道80）</option>
+                                <option value="ゆうパック（東京60）">ゆうパック（東京60）</option>
+                                <option value="ゆうパック（東京80）">ゆうパック（東京80）</option>
+                                <option value="ゆうパック（東北関東甲信越60）">ゆうパック（東北関東甲信越60）</option>
+                                <option value="ゆうパック（東北関東甲信越80）">ゆうパック（東北関東甲信越80）</option>
+                                <option value="ゆうパック（近畿60）">ゆうパック（近畿60）</option>
+                                <option value="ゆうパック（近畿80）">ゆうパック（近畿80）</option>
+                                <option value="ゆうパック（中国、四国60）">ゆうパック（中国、四国60）</option>
+                                <option value="ゆうパック（中国、四国80）">ゆうパック（中国、四国80）</option>
+                                <option value="ゆうパック（九州60）">ゆうパック（九州60）</option>
+                                <option value="ゆうパック（九州80）">ゆうパック（九州80）</option>
+                                <option value="ゆうパック（沖縄60）">ゆうパック（沖縄60）</option>
+                                <option value="ゆうパック（沖縄80）">ゆうパック（沖縄80）</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">発送費用 (店舗実費)</label>
+                            <input type="number" id="field-発送費用" min="0" value="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                        <div class="hidden md:block"></div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">決済手数料名</label>
+                            <select id="field-決済手数料名" onchange="updateSettlementFee()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                                <option value="">選択してください</option>
+                                <option value="ストアーズネット決済（クレジットカード）">ストアーズネット決済（クレジットカード）</option>
+                                <option value="ストアーズネット決済（コンビニ決済）">ストアーズネット決済（コンビニ決済）</option>
+                                <option value="ストアーズネット決済（銀行振込）">ストアーズネット決済（銀行振込）</option>
+                                <option value="ストアーズネット決済（キャリア決済）">ストアーズネット決済（キャリア決済）</option>
+                                <option value="ストアーズネット決済（楽天ペイ）">ストアーズネット決済（楽天ペイ）</option>
+                                <option value="ストアーズネット決済（あと払い（ペイディ））">ストアーズネット決済（あと払い（ペイディ））</option>
+                                <option value="ストアーズネット決済（PayPal）">ストアーズネット決済（PayPal）</option>
+                                <option value="ストアーズネット決済（PayPay）">ストアーズネット決済（PayPay）</option>
+                                <option value="ストアーズネット決済（Amazon Pay）">ストアーズネット決済（Amazon Pay）</option>
+                                <option value="ストアーズネット決済（atone）">ストアーズネット決済（atone）</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">決済手数料 (金額)</label>
+                            <input type="number" id="field-決済手数料" min="0" value="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 5: 損益・ステータス -->
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                    <h4 class="text-sm font-bold text-slate-800 flex items-center space-x-2 border-b border-slate-200 pb-2">
+                        <i class="fa-solid fa-calculator text-purple-600"></i>
+                        <span>⑤ 損益・ステータス</span>
+                    </h4>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">利益 (粗利)</label>
+                            <input type="number" id="field-利益" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 text-emerald-700 font-bold rounded-lg text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">利益率 (%)</label>
+                            <input type="number" id="field-利益率" step="0.1" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 text-emerald-700 font-bold rounded-lg text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">ステータス</label>
+                            <select id="field-ステータス" onchange="checkSoldOutSalesDateWarning()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                                <option value="販売中">販売中</option>
+                                <option value="SoldOut">SoldOut</option>
+                                <option value="廃棄">廃棄</option>
+                                <option value="保留" selected>保留</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">売上日</label>
+                            <input type="date" id="field-売上日" oninput="checkSoldOutSalesDateWarning()" onchange="checkSoldOutSalesDateWarning()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">入金日</label>
+                            <input type="date" id="field-入金日" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                        <div class="hidden md:block"></div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">転記</label>
+                            <input type="text" id="field-転記" placeholder="済 / 未" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">証憑</label>
+                            <input type="text" id="field-証憑" placeholder="領収書No等" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">記入日</label>
+                            <input type="date" id="field-記入日" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                        <div class="md:col-span-3">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">備考</label>
+                            <textarea id="field-備考" rows="2" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white" placeholder="商品のコンディション・特記事項..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer Buttons -->
+                <div class="pt-4 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-2 sticky bottom-0 bg-white py-2">
+                    <div id="soldout-warning-msg" class="text-xs font-bold text-red-600 hidden flex items-center space-x-1">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span>※売上日の入力が必要です</span>
+                    </div>
+                    <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+                        <button type="button" onclick="closeBookModal()" class="px-4 py-2 border border-slate-300 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition">
+                            キャンセル
+                        </button>
+                        <button type="submit" id="modal-save-btn" class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow transition flex items-center space-x-2">
+                            <i class="fa-solid fa-floppy-disk"></i>
+                            <span>データを保存</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Barcode Print Modal -->
+    <div id="barcode-modal" class="fixed inset-0 modal-backdrop z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="font-bold text-slate-800">バーコード・ラベル印刷</h3>
+                <button onclick="closeBarcodeModal()" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div id="print-label-area" class="border border-slate-300 rounded-xl p-4 bg-white shadow-inner flex flex-col items-center space-y-2">
+                <p id="barcode-book-title" class="font-bold text-sm text-slate-800 line-clamp-2"></p>
+                <p id="barcode-book-price" class="text-xs text-slate-600"></p>
+                <svg id="barcode-canvas" class="max-w-full"></svg>
+                <p id="barcode-book-id" class="font-mono text-xs text-slate-500"></p>
+            </div>
+
+            <div class="flex justify-center space-x-3 pt-2">
+                <button onclick="window.print()" class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center space-x-2 transition shadow">
+                    <i class="fa-solid fa-print"></i>
+                    <span>印刷する</span>
+                </button>
+                <button onclick="closeBarcodeModal()" class="border border-slate-300 text-slate-600 px-4 py-2 rounded-xl text-sm font-medium hover:bg-slate-50 transition">
+                    閉じる
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Camera Scanner Modal -->
+    <div id="scanner-modal" class="fixed inset-0 modal-backdrop z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <div class="flex items-center space-x-2 text-indigo-600">
+                    <i class="fa-solid fa-camera"></i>
+                    <h3 class="font-bold text-slate-800">カメラ・バーコード読み取り</h3>
+                </div>
+                <button onclick="closeBarcodeScannerModal()" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="relative bg-slate-900 rounded-xl overflow-hidden min-h-[260px] flex items-center justify-center">
+                <div id="reader" class="w-full"></div>
+            </div>
+
+            <p class="text-xs text-slate-500 text-center">カメラにISBNまたはISCバーコードをかざしてください。</p>
+
+            <div class="flex justify-end">
+                <button onclick="closeBarcodeScannerModal()" class="border border-slate-300 text-slate-600 px-4 py-2 rounded-xl text-sm font-medium hover:bg-slate-50 transition">
+                    閉じる
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        const STORAGE_KEY = 'book_inventory_excel_v6';
+
+        const EXACT_41_FIELDS = [
+            "ID", "転記", "書名", "著者", "出版社", "ISBN", "ISC", "発行年", 
+            "本体価格", "本体税率", "税込価格", "仕入時の状態", "仕入日", "仕入先", "束親", 
+            "仕入数", "仕入値", "仕入値（税抜）", "掛率", "仕入送料", "仕入送料（税抜）", 
+            "仕入合計", "売上数", "在庫数", "在庫金額", "販売場所", "登録日", 
+            "販売価格", "販売価格（税抜）", "販売税率", "販売送料", "販売送料（税抜）", "販売送料税率", "売上合計", "発送手段", "発送費用", "決済手数料名", 
+            "決済手数料", "利益", "利益率", "売上日", "入金日", "ステータス", 
+            "備考", "証憑", "記入日"
+        ];
+
+        function formatAuthorName(rawAuthor) {
+            if (!rawAuthor) return '';
+            return String(rawAuthor)
+                .replace(/[，,]/g, '')     
+                .replace(/[\s ]+/g, '')   
+                .trim();
+        }
+
+        function cleanAuthorInput(inputElem) {
+            if (!inputElem) return;
+            inputElem.value = formatAuthorName(inputElem.value);
+        }
+
+        function formatPubDateInput(inputElem) {
+            if (!inputElem || !inputElem.value) return;
+            let val = inputElem.value.trim().replace(/[-.]/g, '/');
+            if (/^\d{6}$/.test(val)) {
+                val = val.substring(0, 4) + '/' + val.substring(4, 6);
+            } else if (/^\d{4}\/\d{1}$/.test(val)) {
+                const parts = val.split('/');
+                val = `${parts[0]}/0${parts[1]}`;
+            } else if (/^\d{4}$/.test(val)) {
+                val = `${val}/01`;
+            }
+            inputElem.value = val;
+        }
+
+        function parseToYearMonth(dateStr) {
+            if (!dateStr) return '';
+            const cleaned = dateStr.replace(/[^0-9]/g, '');
+            if (cleaned.length >= 6) {
+                return `${cleaned.substring(0, 4)}/${cleaned.substring(4, 6)}`;
+            } else if (cleaned.length >= 4) {
+                return `${cleaned.substring(0, 4)}/01`;
+            }
+            return dateStr;
+        }
+
+        const INITIAL_SAMPLE_BOOKS = [
+            {
+                "ID": "1",
+                "転記": "済",
+                "書名": "いねむり先生",
+                "著者": "伊集院静",
+                "出版社": "文藝春秋",
+                "ISBN": "9784163745206",
+                "ISC": "2183920184712",
+                "発行年": "2011/09",
+                "本体価格": 1500,
+                "本体税率": 10,
+                "税込価格": 1650,
+                "仕入時の状態": "古本",
+                "仕入日": "2023-11-01",
+                "仕入先": "神田古書市場",
+                "束親": "",
+                "仕入数": 1,
+                "仕入値": 300,
+                "仕入値（税抜）": 273,
+                "掛率": 18.2,
+                "仕入送料": 0,
+                "仕入送料（税抜）": 0,
+                "仕入合計": 300,
+                "売上数": 1,
+                "在庫数": 0,
+                "在庫金額": 0,
+                "販売場所": "ストアーズ（古本）",
+                "登録日": "2023-11-02",
+                "販売価格": 1200,
+                "販売価格（税抜）": 1091,
+                "販売税率": 10,
+                "販売送料": 210,
+                "販売送料（税抜）": 191,
+                "販売送料税率": 10,
+                "売上合計": 1410,
+                "発送手段": "クリックポスト",
+                "発送費用": 185,
+                "決済手数料名": "ストアーズ手数料",
+                "決済手数料": 120,
+                "利益": 1110,
+                "利益率": 78.7,
+                "売上日": "2023-11-10",
+                "入金日": "2023-11-12",
+                "ステータス": "SoldOut",
+                "備考": "帯付き・帯美品",
+                "証憑": "領書101",
+                "記入日": "2023-11-01"
+            },
+            {
+                "ID": "2",
+                "転記": "未",
+                "書名": "人間はどこまで動物か",
+                "著者": "日高敏隆",
+                "出版社": "新潮社",
+                "ISBN": "9784101132013",
+                "ISC": "2149102837481",
+                "発行年": "1997/04",
+                "本体価格": 520,
+                "本体税率": 10,
+                "税込価格": 572,
+                "仕入時の状態": "新本P",
+                "仕入日": "2023-11-05",
+                "仕入先": "個人買取",
+                "束親": "",
+                "仕入数": 1,
+                "仕入値": 100,
+                "仕入値（税抜）": 91,
+                "掛率": 17.5,
+                "仕入送料": 0,
+                "仕入送料（税抜）": 0,
+                "仕入合計": 100,
+                "売上数": 0,
+                "在庫数": 1,
+                "在庫金額": 100,
+                "販売場所": "店舗（古本）",
+                "登録日": "2023-11-06",
+                "販売価格": 450,
+                "販売価格（税抜）": 409,
+                "販売税率": 10,
+                "販売送料": 0,
+                "販売送料（税抜）": 0,
+                "販売送料税率": 10,
+                "売上合計": 450,
+                "発送手段": "店頭渡し",
+                "発送費用": 0,
+                "決済手数料名": "現金",
+                "決済手数料": 0,
+                "利益": 350,
+                "利益率": 77.8,
+                "売上日": "",
+                "入金日": "",
+                "ステータス": "販売中",
+                "備考": "カバーに小ヤケ",
+                "証憑": "",
+                "記入日": "2023-11-05"
+            }
+        ];
+
+        let booksData = [];
+        let html5QrcodeScanner = null;
+        let idSortAscending = true;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            loadFromLocalStorage();
+            renderTable();
+        });
+
+        function loadFromLocalStorage() {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) {
+                try {
+                    booksData = JSON.parse(raw);
+                } catch (e) {
+                    booksData = [...INITIAL_SAMPLE_BOOKS];
+                }
+            } else {
+                booksData = [...INITIAL_SAMPLE_BOOKS];
+                saveToLocalStorage();
+            }
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(booksData));
+        }
+
+        function generateNextID() {
+            if (!booksData || booksData.length === 0) return 1;
+
+            let maxId = 0;
+            booksData.forEach(book => {
+                if (book.ID) {
+                    const parsed = parseInt(String(book.ID).replace(/[^0-9]/g, ''), 10);
+                    if (!isNaN(parsed) && parsed > maxId) {
+                        maxId = parsed;
+                    }
+                }
+            });
+
+            return maxId + 1;
+        }
+
+        function calculateJanCheckDigit(first12Digits) {
+            if (first12Digits.length !== 12) return "0";
+            let sumEven = 0;
+            let sumOdd = 0;
+
+            for (let i = 0; i < 12; i++) {
+                const digit = parseInt(first12Digits.charAt(i), 10);
+                if (i % 2 === 0) {
+                    sumOdd += digit;
+                } else {
+                    sumEven += digit;
+                }
+            }
+
+            const total = sumOdd + (sumEven * 3);
+            const remainder = total % 10;
+            return remainder === 0 ? "0" : String(10 - remainder);
+        }
+
+        function generateISC(conditionVal) {
+            let prefix = '21'; 
+
+            if (conditionVal === '新本') {
+                prefix = '20';
+            } else if (conditionVal === 'バーゲンブック') {
+                prefix = '22';
+            } else if (conditionVal === '新本P' || conditionVal === '古本') {
+                prefix = '21';
+            }
+
+            let random10 = '';
+            for (let i = 0; i < 10; i++) {
+                random10 += Math.floor(Math.random() * 10).toString();
+            }
+
+            const first12 = prefix + random10;
+            const checkDigit = calculateJanCheckDigit(first12);
+
+            return first12 + checkDigit;
+        }
+
+        function regenerateISCByCondition() {
+            const conditionVal = document.getElementById('field-仕入時の状態').value;
+            const newISC = generateISC(conditionVal);
+            document.getElementById('field-ISC').value = newISC;
+        }
+
+        function toggleIdSort() {
+            idSortAscending = !idSortAscending;
+            
+            const icon = document.getElementById('id-sort-icon');
+            if (icon) {
+                icon.className = idSortAscending ? "fa-solid fa-sort-up text-indigo-600 ml-1" : "fa-solid fa-sort-down text-indigo-600 ml-1";
+            }
+            
+            renderTable();
+        }
+
+        function checkSoldOutSalesDateWarning() {
+            const statusVal = document.getElementById('field-ステータス').value;
+            const saleDateVal = document.getElementById('field-売上日').value.trim();
+            const warningMsg = document.getElementById('soldout-warning-msg');
+            const saveBtn = document.getElementById('modal-save-btn');
+
+            if (statusVal === 'SoldOut' && !saleDateVal) {
+                if (warningMsg) warningMsg.classList.remove('hidden');
+                if (saveBtn) {
+                    saveBtn.className = "px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-semibold shadow transition flex items-center space-x-2 animate-pulse";
+                }
+            } else {
+                if (warningMsg) warningMsg.classList.add('hidden');
+                if (saveBtn) {
+                    saveBtn.className = "px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow transition flex items-center space-x-2";
+                }
+            }
+        }
+
+        function updateSalesCountFromTable(index, value) {
+            if (booksData[index]) {
+                const book = booksData[index];
+                const purchaseQty = parseFloat(book.仕入数) || 0;
+                let newSalesQty = parseInt(value, 10);
+                
+                if (isNaN(newSalesQty) || newSalesQty < 0) {
+                    newSalesQty = 0;
+                }
+
+                if (newSalesQty > purchaseQty) {
+                    alert(`売上数は仕入数（${purchaseQty}冊）を超えることはできません。`);
+                    newSalesQty = purchaseQty;
+                }
+
+                booksData[index].売上数 = newSalesQty;
+
+                let calculatedStock = purchaseQty - newSalesQty;
+                if (calculatedStock < 0) calculatedStock = 0;
+                book.在庫数 = calculatedStock;
+
+                if (calculatedStock === 0) {
+                    book.ステータス = 'SoldOut';
+                    if (!book.売上日) {
+                        alert(`【警告】書籍「${book.書名 || '名称未設定'}」の在庫が0になりSoldOutになりましたが、売上日が未記入です。`);
+                    }
+                } else {
+                    if (book.ステータス === 'SoldOut') {
+                        book.ステータス = '販売中';
+                    }
+                }
+
+                const purchaseUnitCost = parseFloat(book.仕入値) || 0;
+                const purchaseShipping = parseFloat(book.仕入送料) || 0;
+                const purchaseTotal = (purchaseUnitCost * purchaseQty) + purchaseShipping;
+                book.仕入合計 = purchaseTotal;
+
+                book.在庫金額 = calculatedStock * purchaseUnitCost;
+
+                const salesPrice = parseFloat(book.販売価格) || 0;
+                const salesShipping = parseFloat(book.販売送料) || 0;
+                const totalSales = salesPrice + salesShipping;
+                book.売上合計 = totalSales;
+
+                const grossProfit = totalSales - purchaseTotal;
+                book.利益 = grossProfit;
+                book.利益率 = totalSales > 0 ? ((grossProfit / totalSales) * 100).toFixed(1) : 0;
+
+                saveToLocalStorage();
+                renderTable();
+            }
+        }
+
+        function updateStatusFromTable(index, value) {
+            if (booksData[index]) {
+                if (value === 'SoldOut' && (!booksData[index].売上日 || String(booksData[index].売上日).trim() === '')) {
+                    alert(`【警告】書籍「${booksData[index].書名 || '名称未設定'}」のステータスが「SoldOut」に変更されましたが、売上日が未記入です。`);
+                }
+                booksData[index].ステータス = value;
+                saveToLocalStorage();
+                renderTable();
+            }
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('inventory-table-body');
+            const emptyState = document.getElementById('empty-state');
+            const rawSearchQuery = document.getElementById('search-input').value.trim();
+            const searchQuery = rawSearchQuery.toLowerCase();
+            const cleanSearchQuery = rawSearchQuery.replace(/[^0-9xX]/g, '').toLowerCase();
+
+            const filterStatus = document.getElementById('filter-status').value;
+            const filterLocation = document.getElementById('filter-location').value;
+
+            tbody.innerHTML = '';
+
+            let totalStock = 0;
+            let totalStockValue = 0;
+            let conditionalPurchaseTotal = 0; 
+            let conditionalSalesTotal = 0;    
+            let conditionalProfitTotal = 0;   
+
+            const filteredBooks = booksData.filter((book) => {
+                const stock = Number(book.在庫数) || 0;
+                const purchaseTotal = Number(book.仕入合計) || 0;
+                const sales = Number(book.売上合計) || 0;
+                const profit = Number(book.利益) || 0;
+
+                totalStock += stock;
+                if (stock > 0) {
+                    totalStockValue += purchaseTotal;
+                }
+
+                const status = book.ステータス;
+                const salesQty = Number(book.売上数) || 0;
+                const saleDate = book.売上日 ? String(book.売上日).trim() : '';
+
+                if (status === 'SoldOut' && salesQty >= 1 && saleDate !== '') {
+                    conditionalPurchaseTotal += purchaseTotal;
+                    conditionalSalesTotal += sales;
+                    conditionalProfitTotal += profit;
+                }
+
+                const cleanISBN = (book.ISBN || '').replace(/[^0-9xX]/g, '').toLowerCase();
+                const cleanISC = (book.ISC || '').replace(/[^0-9xX]/g, '').toLowerCase();
+
+                const matchesSearch = !searchQuery || 
+                    (book.ID && String(book.ID).toLowerCase().includes(searchQuery)) ||
+                    (book.書名 && book.書名.toLowerCase().includes(searchQuery)) ||
+                    (book.著者 && book.著者.toLowerCase().includes(searchQuery)) ||
+                    (book.出版社 && book.出版社.toLowerCase().includes(searchQuery)) ||
+                    (book.ISBN && book.ISBN.toLowerCase().includes(searchQuery)) ||
+                    (cleanSearchQuery && cleanISBN.includes(cleanSearchQuery)) ||
+                    (book.ISC && book.ISC.toLowerCase().includes(searchQuery)) ||
+                    (cleanSearchQuery && cleanISC.includes(cleanSearchQuery)) ||
+                    (book.販売場所 && book.販売場所.toLowerCase().includes(searchQuery));
+
+                const matchesStatus = !filterStatus || book.ステータス === filterStatus;
+                const matchesLocation = !filterLocation || book.販売場所 === filterLocation;
+
+                return matchesSearch && matchesStatus && matchesLocation;
+            });
+
+            filteredBooks.sort((a, b) => {
+                const idANum = parseInt(String(a.ID).replace(/[^0-9]/g, ''), 10);
+                const idBNum = parseInt(String(b.ID).replace(/[^0-9]/g, ''), 10);
+
+                if (!isNaN(idANum) && !isNaN(idBNum)) {
+                    return idSortAscending ? idANum - idBNum : idBNum - idANum;
+                }
+                const strA = String(a.ID || '');
+                const strB = String(b.ID || '');
+                return idSortAscending ? strA.localeCompare(strB) : strB.localeCompare(strA);
+            });
+
+            document.getElementById('stat-total-stock').innerHTML = `${totalStock.toLocaleString()} <span class="text-xs font-normal text-slate-500">冊</span>`;
+            document.getElementById('stat-stock-value').innerText = `¥${totalStockValue.toLocaleString()}`;
+            document.getElementById('stat-total-sales').innerText = `¥${conditionalPurchaseTotal.toLocaleString()}`;
+            document.getElementById('stat-conditional-total-sales').innerText = `¥${conditionalSalesTotal.toLocaleString()}`;
+            document.getElementById('stat-total-profit').innerText = `¥${conditionalProfitTotal.toLocaleString()}`;
+
+            renderMonthlySummary();
+
+            if (filteredBooks.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden');
+
+            filteredBooks.forEach((book) => {
+                const originalIndex = booksData.indexOf(book);
+                
+                const isSoldOut = book.ステータス === 'SoldOut';
+                const hasSalesDateError = isSoldOut && (!book.売上日 || String(book.売上日).trim() === '');
+
+                const tr = document.createElement('tr');
+                tr.className = `transition text-sm ${hasSalesDateError ? 'bg-red-50/80 border-l-4 border-red-500' : (isSoldOut ? 'opacity-50 bg-slate-300/100' : 'hover:bg-slate-50/85')}`;
+
+                let statusSelectClass = 'px-2.5 py-1 text-xs font-semibold rounded-full border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer ';
+                switch(book.ステータス) {
+                    case '販売中':
+                        statusSelectClass += 'bg-blue-100 text-blue-800';
+                        break;
+                    case 'SoldOut':
+                        statusSelectClass += 'bg-slate-200 text-slate-700';
+                        break;
+                    case '廃棄':
+                        statusSelectClass += 'bg-red-100 text-red-800';
+                        break;
+                    case '保留':
+                        statusSelectClass += 'bg-amber-100 text-amber-800';
+                        break;
+                    default:
+                        statusSelectClass += 'bg-slate-100 text-slate-700';
+                }
+
+                const statusSelect = `
+                    <select onchange="updateStatusFromTable(${originalIndex}, this.value)" class="${statusSelectClass}">
+                        <option value="販売中" ${book.ステータス === '販売中' ? 'selected' : ''}>販売中</option>
+                        <option value="SoldOut" ${book.ステータス === 'SoldOut' ? 'selected' : ''}>SoldOut</option>
+                        <option value="廃棄" ${book.ステータス === '廃棄' ? 'selected' : ''}>廃棄</option>
+                        <option value="保留" ${book.ステータス === '保留' ? 'selected' : ''}>保留</option>
+                    </select>
+                    ${hasSalesDateError ? '<div class="mt-1 text-[10px] text-red-600 font-bold flex items-center justify-center space-x-0.5"><i class="fa-solid fa-triangle-exclamation"></i><span>売上日未記入</span></div>' : ''}
+                `;
+
+                const price = Number(book.販売価格) || 0;
+                const shipping = Number(book.販売送料) || 0;
+                const totalSalesVal = Number(book.売上合計) || (price + shipping);
+
+                const purchasePrice = Number(book.仕入値) || 0;
+                const purchaseShipping = Number(book.仕入送料) || 0;
+                const purchaseQty = Number(book.仕入数) || 1;
+                const purchaseTotal = Number(book.仕入合計) || ((purchasePrice * purchaseQty) + purchaseShipping);
+
+                const profit = Number(book.利益) || 0;
+
+                tr.innerHTML = `
+                    <td class="py-2 px-4 font-mono font-bold text-indigo-600">
+                        ${escapeHtml(book.ID || '')}
+                        <div class="text-[10px] font-normal text-slate-400 font-sans">${escapeHtml(book.販売場所 || '未設定')}</div>
+                    </td>
+                    <td class="py-2 px-4 max-w-xs">
+                        <div class="font-bold text-slate-800 truncate">${escapeHtml(book.書名 || '名称未設定')}</div>
+                        <div class="text-xs text-slate-500">${escapeHtml(formatAuthorName(book.著者) || '-')}</div>
+                    </td>
+                    <td class="py-2 px-4 text-xs text-slate-600">
+                        <div>${escapeHtml(book.出版社 || '-')}</div>
+                        <div class="font-mono text-slate-500">${escapeHtml(book.ISBN || '-')}</div>
+                        <div class="font-mono text-indigo-600 font-medium">${escapeHtml(book.ISC || '-')}</div>
+                    </td>
+                    <td class="py-2 px-4 text-center">${statusSelect}</td>
+                    <td class="py-2 px-4 text-center">
+                        <input type="number" min="0" max="${purchaseQty}" value="${Number(book.売上数 || 0)}" 
+                            onchange="updateSalesCountFromTable(${originalIndex}, this.value)" 
+                            class="w-16 px-2 py-1 text-center border border-slate-300 rounded-lg text-sm font-mono font-bold bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </td>
+                    <td class="py-2 px-4 text-center font-bold">${Number(book.在庫数 || 0).toLocaleString()}</td>
+                    
+                    <td class="py-2 px-4 text-right font-mono">
+                        <div class="font-bold text-slate-800">¥${purchaseTotal.toLocaleString()}</div>
+                        <div class="text-[10px] text-slate-400">仕入値: ¥${purchasePrice.toLocaleString()} 送料: ¥${purchaseShipping.toLocaleString()}</div>
+                    </td>
+
+                    <td class="py-2 px-4 text-right font-mono">
+                        <div class="font-bold text-slate-800">¥${totalSalesVal.toLocaleString()}</div>
+                        <div class="text-[10px] text-slate-400">販売価格: ¥${price.toLocaleString()} 送料: ¥${shipping.toLocaleString()}</div>
+                    </td>
+
+                    <td class="py-2 px-4 text-right font-mono font-bold ${profit >= 0 ? 'text-emerald-600' : 'text-red-500'}">
+                        ¥${profit.toLocaleString()}
+                    </td>
+                    <td class="py-2 px-4 text-center">
+                        <div class="flex items-center justify-center space-x-1.5">
+                            <button onclick="openBarcodeModal(${originalIndex})" class="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="バーコード印刷">
+                                <i class="fa-solid fa-barcode"></i>
+                            </button>
+                            <button onclick="openBookModal(${originalIndex})" class="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="編集">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                            <button onclick="deleteBook(${originalIndex})" class="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="削除">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // 年別・月別集計（アコーディオン対応版）
+        function renderMonthlySummary() {
+            const summaryMap = {};
+
+            booksData.forEach(book => {
+                const saleDate = book.売上日 ? book.売上日.trim() : '';
+                if (!saleDate) return;
+                if (book.ステータス !== 'SoldOut') return;
+
+                const cleaned = saleDate.replace(/[^0-9]/g, '');
+                let year = '未設定';
+                let month = 'その他';
+                let yearMonthKey = '未設定 / その他';
+
+                if (cleaned.length >= 6) {
+                    year = cleaned.substring(0, 4) + '年';
+                    month = cleaned.substring(4, 6) + '月';
+                    yearMonthKey = `${year} ${month}`;
+                } else if (cleaned.length >= 4) {
+                    year = cleaned.substring(0, 4) + '年';
+                    month = '01月';
+                    yearMonthKey = `${year} 01月`;
+                }
+
+                if (!summaryMap[year]) {
+                    summaryMap[year] = {
+                        sales: 0,
+                        cost: 0,
+                        profit: 0,
+                        salesCount: 0,
+                        months: {}
+                    };
+                }
+
+                if (!summaryMap[year].months[yearMonthKey]) {
+                    summaryMap[year].months[yearMonthKey] = {
+                        sales: 0,
+                        cost: 0,
+                        profit: 0,
+                        salesCount: 0
+                    };
+                }
+
+                const salesVal = Number(book.売上合計) || 0;
+                const costVal = Number(book.仕入合計) || 0;
+                const profitVal = Number(book.利益) || 0;
+                const countVal = Number(book.売上数) || 0;
+
+                summaryMap[year].sales += salesVal;
+                summaryMap[year].cost += costVal;
+                summaryMap[year].profit += profitVal;
+                summaryMap[year].salesCount += countVal;
+
+                summaryMap[year].months[yearMonthKey].sales += salesVal;
+                summaryMap[year].months[yearMonthKey].cost += costVal;
+                summaryMap[year].months[yearMonthKey].profit += profitVal;
+                summaryMap[year].months[yearMonthKey].salesCount += countVal;
+            });
+
+            const summaryTbody = document.getElementById('summary-table-body');
+            if (!summaryTbody) return;
+            summaryTbody.innerHTML = '';
+
+            const sortedYears = Object.keys(summaryMap).sort().reverse();
+
+            if (sortedYears.length === 0) {
+                summaryTbody.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-slate-400">条件に合致する集計データがありません</td></tr>`;
+                return;
+            }
+
+            sortedYears.forEach((year, yearIdx) => {
+                const yearData = summaryMap[year];
+                const yearRowId = `year-row-${yearIdx}`;
+                
+                // 年ごとのアコーディオン親行
+                const yearTr = document.createElement('tr');
+                yearTr.className = "bg-slate-50 hover:bg-slate-100 transition cursor-pointer font-bold text-slate-800 border-t-2 border-slate-200 select-none";
+                yearTr.setAttribute('onclick', `toggleYearAccordion('${yearRowId}')`);
+                yearTr.innerHTML = `
+                    <td class="py-3 px-4 flex items-center space-x-2">
+                        <i id="${yearRowId}-icon" class="fa-solid fa-chevron-right text-xs text-indigo-600 transition-transform duration-200"></i>
+                        <span>${year} (年間合計)</span>
+                    </td>
+                    <td class="py-3 px-4 text-right font-mono">¥${yearData.sales.toLocaleString()}</td>
+                    <td class="py-3 px-4 text-right font-mono text-slate-600">¥${yearData.cost.toLocaleString()}</td>
+                    <td class="py-3 px-4 text-right font-mono text-emerald-600">¥${yearData.profit.toLocaleString()}</td>
+                    <td class="py-3 px-4 text-center font-mono">${yearData.salesCount.toLocaleString()} 冊</td>
+                `;
+                summaryTbody.appendChild(yearTr);
+
+                // 月別行（アコーディオン子行：初期状態で hidden を付与）
+                const sortedMonths = Object.keys(yearData.months).sort().reverse();
+                sortedMonths.forEach(ymKey => {
+                    const monthData = yearData.months[ymKey];
+                    const monthTr = document.createElement('tr');
+                    monthTr.className = `child-of-${yearRowId} hidden bg-white hover:bg-slate-50 transition text-sm border-b border-slate-100`;
+                    monthTr.innerHTML = `
+                        <td class="py-2.5 px-4 pl-8 text-slate-700 flex items-center space-x-2">
+                            <i class="fa-solid fa-angle-right text-xs text-slate-400"></i>
+                            <span>${ymKey}</span>
+                        </td>
+                        <td class="py-2.5 px-4 text-right font-mono text-slate-800">¥${monthData.sales.toLocaleString()}</td>
+                        <td class="py-2.5 px-4 text-right font-mono text-slate-600">¥${monthData.cost.toLocaleString()}</td>
+                        <td class="py-2.5 px-4 text-right font-mono text-emerald-600">¥${monthData.profit.toLocaleString()}</td>
+                        <td class="py-2.5 px-4 text-center font-mono">${monthData.salesCount.toLocaleString()} 冊</td>
+                    `;
+                    summaryTbody.appendChild(monthTr);
+                });
+            });
+        }
+
+        // アコーディオンの開閉処理関数
+        function toggleYearAccordion(yearRowId) {
+            const childRows = document.querySelectorAll(`.child-of-${yearRowId}`);
+            const icon = document.getElementById(`${yearRowId}-icon`);
+            
+            let isHidden = false;
+            childRows.forEach(row => {
+                row.classList.toggle('hidden');
+                if (row.classList.contains('hidden')) {
+                    isHidden = true;
+                }
+            });
+
+            if (icon) {
+                if (isHidden) {
+                    icon.classList.remove('fa-chevron-down');
+                    icon.classList.add('fa-chevron-right');
+                } else {
+                    icon.classList.remove('fa-chevron-right');
+                    icon.classList.add('fa-chevron-down');
+                }
+            }
+        }
+
+        function calculateTaxFromListPrice() {
+            const listPrice = parseFloat(document.getElementById('field-本体価格').value) || 0;
+            const taxRate = parseFloat(document.getElementById('field-本体税率').value) || 0;
+            const calculatedTaxPrice = Math.round(listPrice * (1 + (taxRate / 100)));
+            document.getElementById('field-税込価格').value = calculatedTaxPrice;
+            
+            recalculateAllCalculatedFields();
+        }
+
+        function calculateSalesPriceTax() {
+            const includeTax = parseFloat(document.getElementById('field-販売価格').value) || 0;
+            const taxRate = parseFloat(document.getElementById('field-販売税率').value) || 0;
+            const excludeTax = includeTax / (1 + (taxRate / 100));
+            document.getElementById('field-販売価格（税抜）').value = Math.round(excludeTax);
+            recalculateAllCalculatedFields();
+        }
+
+        function calculateSalesShippingTax() {
+            const includeTax = parseFloat(document.getElementById('field-販売送料').value) || 0;
+            const taxRate = parseFloat(document.getElementById('field-販売送料税率').value) || 0;
+            const excludeTax = includeTax / (1 + (taxRate / 100));
+            document.getElementById('field-販売送料（税抜）').value = Math.round(excludeTax);
+            recalculateAllCalculatedFields();
+        }
+
+        function recalculateAllCalculatedFields() {
+            const purchaseUnitCost = parseFloat(document.getElementById('field-仕入値').value) || 0; 
+            const purchaseShipping = parseFloat(document.getElementById('field-仕入送料').value) || 0;
+            
+            const purchaseQty = parseFloat(document.getElementById('field-仕入数').value) || 0;
+            let salesQty = parseFloat(document.getElementById('field-売上数').value) || 0;
+            
+            if (salesQty > purchaseQty) {
+                salesQty = purchaseQty;
+                document.getElementById('field-売上数').value = salesQty;
+            }
+
+            document.getElementById('field-売上数').max = purchaseQty;
+            
+            let calculatedStock = purchaseQty - salesQty;
+            if (calculatedStock < 0) calculatedStock = 0;
+            document.getElementById('field-在庫数').value = calculatedStock;
+
+            if (calculatedStock === 0) {
+                document.getElementById('field-ステータス').value = 'SoldOut';
+            } else {
+                if (document.getElementById('field-ステータス').value === 'SoldOut') {
+                    document.getElementById('field-ステータス').value = '販売中';
+                }
+            }
+
+            const purchaseTaxRate = parseFloat(document.getElementById('field-仕入税率').value) || 0;
+            const purchaseTaxMultiplier = 1 + (purchaseTaxRate / 100);
+
+            const shippingTaxRate = parseFloat(document.getElementById('field-仕入送料税率').value) || 0;
+            const shippingTaxMultiplier = 1 + (shippingTaxRate / 100);
+
+            const salesPrice = parseFloat(document.getElementById('field-販売価格').value) || 0;
+            const salesShipping = parseFloat(document.getElementById('field-販売送料').value) || 0;
+            const stockQty = calculatedStock;
+
+            document.getElementById('field-仕入値（税抜）').value = Math.round(purchaseUnitCost / purchaseTaxMultiplier);
+            document.getElementById('field-仕入送料（税抜）').value = Math.round(purchaseShipping / shippingTaxMultiplier);
+            
+            const purchaseTotal = (purchaseUnitCost * purchaseQty) + purchaseShipping;
+            document.getElementById('field-仕入合計').value = purchaseTotal;
+
+            const zeikomiJidou = parseFloat(document.getElementById('field-税込価格').value) || 0;
+            const discountRate = zeikomiJidou > 0 ? ((purchaseUnitCost / zeikomiJidou) * 100).toFixed(1) : 0;
+            document.getElementById('field-掛率').value = discountRate;
+
+            document.getElementById('field-在庫金額').value = stockQty * purchaseUnitCost;
+
+            const totalSales = salesPrice + salesShipping;
+            document.getElementById('field-売上合計').value = totalSales;
+
+            updateSettlementFee();
+
+            const grossProfit = totalSales - purchaseTotal;
+            document.getElementById('field-利益').value = grossProfit;
+
+            const profitMargin = totalSales > 0 ? ((grossProfit / totalSales) * 100).toFixed(1) : 0;
+            document.getElementById('field-利益率').value = profitMargin;
+            
+            checkSoldOutSalesDateWarning();
+        }
+
+        async function fetchBookInfoByISBN(targetIsbn = null) {
+            let isbn = targetIsbn || document.getElementById('isbn-lookup-input').value.trim();
+            if (!isbn) {
+                isbn = document.getElementById('field-ISBN').value.trim();
+            }
+
+            const cleanIsbn = isbn.replace(/[^0-9xX]/gi, '');
+            if (cleanIsbn.length !== 10 && cleanIsbn.length !== 13) {
+                if (!targetIsbn) alert("有効なISBNコード（10桁または13桁）ではありません。");
+                return false;
+            }
+
+            let bookData = null;
+
+            try {
+                const res = await fetch(`https://api.openbd.jp/v1/get?isbn=${cleanIsbn}`);
+                const data = await res.json();
+                if (data && data[0] && data[0].summary) {
+                    const summary = data[0].summary;
+                    
+                    let rawPrice = summary.price;
+                    if (!rawPrice && data[0].onix) {
+                        try {
+                            const supplyDetail = data[0].onix.ProductSupply?.SupplyDetail;
+                            if (Array.isArray(supplyDetail) && supplyDetail[0]?.Price?.[0]?.PriceAmount) {
+                                rawPrice = supplyDetail[0].Price[0].PriceAmount;
+                            } else if (supplyDetail?.Price?.[0]?.PriceAmount) {
+                                rawPrice = supplyDetail.Price[0].PriceAmount;
+                            }
+                        } catch (e) {}
+                    }
+
+                    bookData = {
+                        title: summary.title || "",
+                        author: formatAuthorName(summary.author || ""),
+                        publisher: summary.publisher || "",
+                        pubdate: parseToYearMonth(summary.pubdate || ""),
+                        price: rawPrice ? String(rawPrice) : ""
+                    };
+                }
+            } catch (e) {}
+
+            if (!bookData) {
+                try {
+                    const res = await fetch(`https://ndlsearch.ndl.go.jp/api/opensearch?isbn=${cleanIsbn}`);
+                    const text = await res.text();
+                    const parser = new DOMParser();
+                    const xml = parser.parseFromString(text, "application/xml");
+                    const item = xml.querySelector("item");
+                    if (item) {
+                        const title = item.querySelector("title")?.textContent || "";
+                        const author = item.querySelector("author")?.textContent || "";
+                        const publisher = item.querySelector("publisher")?.textContent || "";
+                        const pubdate = item.querySelector("pubDate")?.textContent || "";
+                        
+                        bookData = {
+                            title: title,
+                            author: formatAuthorName(author),
+                            publisher: publisher,
+                            pubdate: parseToYearMonth(pubdate.substring(0, 10)),
+                            price: ""
+                        };
+                    }
+                } catch (e) {}
+            }
+
+            if (!bookData) {
+                try {
+                    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanIsbn}`);
+                    const data = await res.json();
+                    if (data && data.items && data.items.length > 0) {
+                        const volumeInfo = data.items[0].volumeInfo;
+                        const authors = volumeInfo.authors ? volumeInfo.authors.join(", ") : "";
+                        
+                        bookData = {
+                            title: volumeInfo.title || "",
+                            author: formatAuthorName(authors),
+                            publisher: volumeInfo.publisher || "",
+                            pubdate: parseToYearMonth(volumeInfo.publishedDate || ""),
+                            price: ""
+                        };
+                    }
+                } catch (e) {}
+            }
+
+            if (bookData) {
+                document.getElementById('field-書名').value = bookData.title;
+                document.getElementById('field-著者').value = bookData.author;
+                document.getElementById('field-出版社').value = bookData.publisher;
+                document.getElementById('field-ISBN').value = cleanIsbn;
+                
+                if (bookData.pubdate) {
+                    document.getElementById('field-発行年').value = bookData.pubdate;
+                }
+                
+                if (bookData.price) {
+                    const numericPrice = parseInt(String(bookData.price).replace(/[^0-9]/g, ''), 10);
+                    if (!isNaN(numericPrice)) {
+                        document.getElementById('field-本体価格').value = numericPrice;
+                        calculateTaxFromListPrice();
+                    }
+                }
+
+                recalculateAllCalculatedFields();
+                if (!targetIsbn) alert("書籍情報の取得に成功しました！");
+                return true;
+            } else {
+                if (!targetIsbn) {
+                    alert("どのデータベースからも書籍情報が見つかりませんでした。手動入力をご利用ください。");
+                }
+                return false;
+            }
+        }
+
+        async function handleScannedBarcode(scannedCode) {
+            const cleanCode = scannedCode.replace(/[^0-9xX]/g, '');
+
+            const existingIdx = booksData.findIndex(b => {
+                const bISBN = (b.ISBN || '').replace(/[^0-9xX]/g, '');
+                const bISC = (b.ISC || '').replace(/[^0-9xX]/g, '');
+                return bISBN === cleanCode || bISC === cleanCode;
+            });
+
+            if (existingIdx !== -1) {
+                alert(`登録済みの書籍が見つかりました（ID: ${booksData[existingIdx].ID}）。編集画面を開きます。`);
+                openBookModal(existingIdx);
+                return;
+            }
+
+            if (cleanCode.startsWith('978') || cleanCode.startsWith('979') || cleanCode.length === 10 || cleanCode.length === 13) {
+                openBookModal(null);
+                document.getElementById('isbn-lookup-input').value = cleanCode;
+                document.getElementById('field-ISBN').value = cleanCode;
+                
+                const success = await fetchBookInfoByISBN(cleanCode);
+                if (success) {
+                    alert(`ISBN: ${cleanCode}\n書籍情報を自動セットしました。情報を確認して保存してください。`);
+                } else {
+                    alert(`ISBN: ${cleanCode}\nAPIからの自動取得ができませんでした。手動でタイトルを入力してください。`);
+                }
+            } else {
+                document.getElementById('search-input').value = scannedCode;
+                renderTable();
+                alert(`バーコード（${scannedCode}）で検索を実行しました。`);
+            }
+        }
+
+        function openBookModal(index = null) {
+            const form = document.getElementById('book-form');
+            form.reset();
+
+            if (index !== null && booksData[index]) {
+                document.getElementById('modal-title').innerText = '書籍情報の編集';
+                document.getElementById('field-editing-index').value = index;
+                const book = booksData[index];
+
+                EXACT_41_FIELDS.forEach(field => {
+                    const input = document.getElementById(`field-${field}`);
+                    if (input) {
+                        let val = book[field] !== undefined ? book[field] : '';
+                        if (field === '著者') val = formatAuthorName(val);
+                        if (field === '本体税率' && (val === '' || val === undefined)) val = 10;
+                        if (field === '仕入税率' && (val === '' || val === undefined)) val = 10;
+                        if (field === '仕入送料税率' && (val === '' || val === undefined)) val = 10;
+                        if (field === '販売税率' && (val === '' || val === undefined)) val = 10;
+                        if (field === '販売送料税率' && (val === '' || val === undefined)) val = 10;
+                        input.value = val;
+                    }
+                });
+
+                calculateTaxFromListPrice();
+                calculateSalesPriceTax();
+                calculateSalesShippingTax();
+                recalculateAllCalculatedFields();
+            } else {
+                document.getElementById('modal-title').innerText = '新規書籍の登録';
+                document.getElementById('field-editing-index').value = '';
+                
+                const dateStr = new Date().toISOString().split('T')[0];
+                const nextId = generateNextID();
+                
+                document.getElementById('field-ID').value = nextId;
+                document.getElementById('field-登録日').value = dateStr;
+                document.getElementById('field-仕入日').value = dateStr;
+                document.getElementById('field-売上日').value = dateStr;
+                document.getElementById('field-記入日').value = dateStr;
+                document.getElementById('field-ステータス').value = '保留';
+                document.getElementById('field-仕入時の状態').value = '新本';
+                document.getElementById('field-仕入数').value = 1;
+                document.getElementById('field-在庫数').value = 1;
+                document.getElementById('field-本体税率').value = 10;
+                document.getElementById('field-仕入税率').value = 10;
+                document.getElementById('field-仕入送料税率').value = 10;
+                document.getElementById('field-販売税率').value = 10;
+                document.getElementById('field-販売送料税率').value = 10;
+
+                document.getElementById('field-ISC').value = generateISC('新本');
+
+                calculateTaxFromListPrice();
+                calculateSalesPriceTax();
+                calculateSalesShippingTax();
+                recalculateAllCalculatedFields();
+            }
+
+            checkSoldOutSalesDateWarning();
+            document.getElementById('book-modal').classList.remove('hidden');
+        }
+
+        function closeBookModal() {
+            document.getElementById('book-modal').classList.add('hidden');
+        }
+
+        function saveBook(e) {
+            e.preventDefault();
+            
+            const purchaseQty = parseFloat(document.getElementById('field-仕入数').value) || 0;
+            const salesQty = parseFloat(document.getElementById('field-売上数').value) || 0;
+            if (salesQty > purchaseQty) {
+                alert(`売上数（${salesQty}）が仕入数（${purchaseQty}）を超えています。売上数は仕入数以下にしてください。`);
+                return;
+            }
+
+            const statusVal = document.getElementById('field-ステータス').value;
+            const saleDateVal = document.getElementById('field-売上日').value;
+            if (statusVal === 'SoldOut' && !saleDateVal) {
+                alert('【警告】ステータスが「SoldOut」に設定されていますが、売上日が未記入です。');
+            }
+
+            const editingIdx = document.getElementById('field-editing-index').value;
+
+            const newBook = {};
+            EXACT_41_FIELDS.forEach(field => {
+                const input = document.getElementById(`field-${field}`);
+                if (input) {
+                    let val = input.value;
+                    if (field === '著者') {
+                        val = formatAuthorName(val);
+                    } else if (field === '発行年') {
+                        val = parseToYearMonth(val);
+                    }
+                    newBook[field] = val;
+                }
+            });
+
+            if (editingIdx !== '') {
+                booksData[editingIdx] = newBook;
+            } else {
+                booksData.unshift(newBook);
+            }
+
+            saveToLocalStorage();
+            renderTable();
+            closeBookModal();
+        }
+
+        function deleteBook(index) {
+            if (confirm(`書籍「${booksData[index].書名 || '名称未設定'}」を削除しますか？`)) {
+                booksData.splice(index, 1);
+                saveToLocalStorage();
+                renderTable();
+            }
+        }
+
+        function openBarcodeModal(index) {
+            const book = booksData[index];
+            if (!book) return;
+
+            document.getElementById('barcode-book-title').innerText = book.書名 || 'タイトル未設定';
+            document.getElementById('barcode-book-price').innerText = `販売価格: ¥${Number(book.販売価格 || 0).toLocaleString()} (送料¥${Number(book.販売送料 || 0).toLocaleString()})`;
+            document.getElementById('barcode-book-id').innerText = `ID: ${book.ID} / ISC: ${book.ISC || '-'}`;
+
+            const barcodeVal = (book.ISC && book.ISC.length === 13) ? book.ISC :
+                               ((book.ISBN && book.ISBN.length >= 10) ? book.ISBN : String(book.ID));
+
+            try {
+                JsBarcode("#barcode-canvas", barcodeVal, {
+                    format: (barcodeVal.length === 13 && !isNaN(barcodeVal)) ? "EAN13" : "CODE128",
+                    width: 2,
+                    height: 55,
+                    displayValue: true,
+                    fontSize: 12,
+                    margin: 5
+                });
+            } catch (e) {
+                JsBarcode("#barcode-canvas", barcodeVal, {
+                    format: "CODE128",
+                    width: 2,
+                    height: 55,
+                    displayValue: true
+                });
+            }
+
+            document.getElementById('barcode-modal').classList.remove('hidden');
+        }
+
+        function closeBarcodeModal() {
+            document.getElementById('barcode-modal').classList.add('hidden');
+        }
+
+        function openBarcodeScannerModal() {
+            document.getElementById('scanner-modal').classList.remove('hidden');
+
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            const config = { fps: 10, qrbox: { width: 250, height: 150 } };
+
+            html5QrcodeScanner.start(
+                { facingMode: "environment" }, 
+                config, 
+                (decodedText) => {
+                    html5QrcodeScanner.stop().then(() => {
+                        closeBarcodeScannerModal();
+                        handleScannedBarcode(decodedText);
+                    });
+                },
+                () => {}
+            ).catch(err => {
+                alert('カメラの起動に失敗しました。アクセス権限をご確認ください。');
+                closeBarcodeScannerModal();
+            });
+        }
+
+        function closeBarcodeScannerModal() {
+            if (html5QrcodeScanner) {
+                try {
+                    html5QrcodeScanner.stop();
+                } catch(e) {}
+            }
+            document.getElementById('scanner-modal').classList.add('hidden');
+        }
+
+        function exportCSV() {
+            if (booksData.length === 0) {
+                alert('出力するデータがありません。');
+                return;
+            }
+
+            let csvContent = "\uFEFF";
+            csvContent += EXACT_41_FIELDS.map(f => `"${f}"`).join(",") + "\n";
+
+            booksData.forEach(book => {
+                const row = EXACT_41_FIELDS.map(field => {
+                    let val = book[field] !== undefined ? book[field] : '';
+                    if (field === '著者') val = formatAuthorName(val);
+                    return `"${String(val).replace(/"/g, '""')}"`;
+                });
+                csvContent += row.join(",") + "\n";
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `書籍在庫データ_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function importCSV(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const text = evt.target.result;
+                const lines = text.split(/\r\n|\n/);
+                if (lines.length < 2) {
+                    alert('有効なCSVデータではありません。');
+                    return;
+                }
+
+                const headers = parseCSVRow(lines[0]);
+                const importedBooks = [];
+
+                for (let i = 1; i < lines.length; i++) {
+                    if (!lines[i].trim()) continue;
+                    const values = parseCSVRow(lines[i]);
+                    const book = {};
+
+                    headers.forEach((header, idx) => {
+                        let val = values[idx] !== undefined ? values[idx] : '';
+                        if (header === '著者') val = formatAuthorName(val);
+                        book[header] = val;
+                    });
+
+                    if (!book['本体税率']) book['本体税率'] = 10;
+                    if (!book['仕入税率']) book['仕入税率'] = 10;
+                    if (!book['仕入送料税率']) book['仕入送料税率'] = 10;
+                    if (!book['販売税率']) book['販売税率'] = 10;
+                    if (!book['販売送料税率']) book['販売送料税率'] = 10;
+
+                    const price = parseFloat(book['販売価格']) || 0;
+                    const shipping = parseFloat(book['販売送料']) || 0;
+                    const totalSales = price + shipping;
+
+                    let purchaseTotal = parseFloat(book['仕入合計']);
+                    if (isNaN(purchaseTotal)) {
+                        const cost = parseFloat(book['仕入値']) || 0;
+                        const pQty = parseFloat(book['仕入数']) || 1;
+                        const pShip = parseFloat(book['仕入送料']) || 0;
+                        purchaseTotal = (cost * pQty) + pShip;
+                        book['仕入合計'] = purchaseTotal;
+                    }
+
+                    book['売上合計'] = totalSales;
+                    book['利益'] = totalSales - purchaseTotal;
+                    book['利益率'] = totalSales > 0 ? (((totalSales - purchaseTotal) / totalSales) * 100).toFixed(1) : 0;
+
+                    if (book.ID || book.書名) {
+                        importedBooks.push(book);
+                    }
+                }
+
+                if (importedBooks.length > 0) {
+                    if (confirm(`${importedBooks.length} 件のデータを読み込みました。現在のデータを置き換えますか？`)) {
+                        booksData = importedBooks;
+                        saveToLocalStorage();
+                        renderTable();
+                        alert('CSVデータの取り込みが完了しました。');
+                    }
+                } else {
+                    alert('有効なデータ列が見つかりませんでした。');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function parseCSVRow(row) {
+            const result = [];
+            let insideQuote = false;
+            let entry = '';
+
+            for (let i = 0; i < row.length; i++) {
+                const c = row[i];
+                if (c === '"') {
+                    if (insideQuote && row[i + 1] === '"') {
+                        entry += '"';
+                        i++;
+                    } else {
+                        insideQuote = !insideQuote;
+                    }
+                } else if (c === ',' && !insideQuote) {
+                    result.push(entry.trim());
+                    entry = '';
+                } else {
+                    entry += c;
+                }
+            }
+            result.push(entry.trim());
+            return result;
+        }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function updateShippingFee() {
+            const shippingMethod = document.getElementById('field-発送手段').value;
+            const feeInput = document.getElementById('field-発送費用');
+            
+            const feeTable = {
+                "日本郵便（クリックポスト）": 300,
+                "日本郵便（レターパックライト）": 450,
+                "日本郵便（レターパックプラス）": 650,
+                "日本郵便（レターパックプラスまとめ）": 1200,
+                "ゆうパック（北海道60）": 1350,
+                "ゆうパック（北海道80）": 1650,
+                "ゆうパック（東京60）": 800,
+                "ゆうパック（東京80）": 1100,
+                "ゆうパック（東北関東甲信越60）": 850,
+                "ゆうパック（東北関東甲信越80）": 1150,
+                "ゆうパック（近畿60）": 950,
+                "ゆうパック（近畿80）": 1250,
+                "ゆうパック（中国、四国60）": 1100,
+                "ゆうパック（中国、四国80）": 1400,
+                "ゆうパック（九州60）": 1350,
+                "ゆうパック（九州80）": 1650,
+                "ゆうパック（沖縄60）": 1400,
+                "ゆうパック（沖縄80）": 1750
+            };
+
+            if (feeTable[shippingMethod] !== undefined) {
+                feeInput.value = feeTable[shippingMethod];
+                
+                if (typeof recalculateAllCalculatedFields === 'function') {
+                    recalculateAllCalculatedFields();
+                }
+            }
+        }
+
+        function updateSettlementFee() {
+            const methodName = document.getElementById('field-決済手数料名').value;
+            const salesTotal = parseFloat(document.getElementById('field-売上合計').value) || 0;
+            const feeInput = document.getElementById('field-決済手数料');
+            
+            const rateTable = {
+                "ストアーズネット決済（クレジットカード）": 0.055,
+                "ストアーズネット決済（コンビニ決済）": 0.055,
+                "ストアーズネット決済（銀行振込）": 0.055,
+                "ストアーズネット決済（キャリア決済）": 0.065,
+                "ストアーズネット決済（楽天ペイ）": 0.065,
+                "ストアーズネット決済（あと払い（ペイディ））": 0.065,
+                "ストアーズネット決済（PayPal）": 0.065,
+                "ストアーズネット決済（PayPay）": 0.065,
+                "ストアーズネット決済（Amazon Pay）": 0.065,
+                "ストアーズネット決済（atone）": 0.065
+            };
+
+            if (rateTable[methodName] !== undefined && salesTotal > 0) {
+                const calculatedFee = Math.round(salesTotal * rateTable[methodName]);
+                feeInput.value = calculatedFee;
+            } else if (methodName === "") {
+                feeInput.value = 0;
+            }
+        }
+
+        const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzxl0aAm58ndEYrPtJL5ttObpcy6ruSC90lJuZ4vfaxfaK8k4FK05eOE04uUoY9qqrSKg/exec";
+
+        async function saveToGoogleSheets() {
+            if (booksData.length === 0) {
+                alert("送信するデータがありません。");
+                return;
+            }
+
+            if (!confirm("現在の全データをGoogleスプレッドシートに同期（上書き/新規追加）しますか？")) {
+                return;
+            }
+
+            try {
+                let successCount = 0;
+                
+                for (const book of booksData) {
+                    await fetch(GAS_WEB_APP_URL, {
+                        method: "POST",
+                        mode: "no-cors",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify(book)
+                    });
+                    successCount++;
+                }
+
+                alert(`スプレッドシートへの同期が完了しました！（計 ${successCount} 件）`);
+            } catch (error) {
+                console.error("送信エラー:", error);
+                alert("スプレッドシートへの保存に失敗しました。コンソールを確認してください。");
+            }
+        }
+    </script>
+</body>
+</html>
