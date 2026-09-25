@@ -1736,7 +1736,11 @@ body {
             const config = { fps: 10, qrbox: { width: 350, height: 150 } };
 
             html5QrcodeScanner.start(
-                { facingMode: "environment" }, 
+                { 
+                    width: { ideal: 1280 }, 
+                    height: { ideal: 720 }, 
+                    facingMode: "environment" 
+                }, // ←このように解像度の指定を追加します
                 config, 
                 (decodedText) => {
                     html5QrcodeScanner.stop().then(() => {
