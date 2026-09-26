@@ -84,6 +84,10 @@ body {
             </div>
             
             <div class="flex items-center space-x-2 sm:space-x-3">
+                <button onclick="openEvidenceScannerModal()" class="bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded-xl text-sm font-medium flex items-center space-x-2 transition shadow">
+                    <i class="fa-solid fa-camera"></i>
+                    <span class="hidden sm:inline">証憑スキャン</span>
+                </button>
                 <button onclick="openBarcodeScannerModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-xl text-sm font-medium flex items-center space-x-2 transition shadow">
                     <i class="fa-solid fa-barcode"></i>
                     <span class="hidden sm:inline">スキャン検索/取得</span>
@@ -671,6 +675,71 @@ body {
         </div>
     </div>
 
+    <!-- Batch Evidence Scanner Modal -->
+    <div id="evidence-scanner-modal" class="fixed inset-0 modal-backdrop z-[60] hidden flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[94vh] flex flex-col overflow-hidden">
+            <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-camera text-amber-400"></i>
+                    <h3 class="text-lg font-bold">証憑をスキャンして一括アップロード</h3>
+                </div>
+                <button type="button" onclick="closeEvidenceScannerModal()" class="text-slate-300 hover:text-white" aria-label="閉じる">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-5 overflow-y-auto">
+                <p class="text-sm text-slate-600">1つの証憑を複数ページ撮影して1つのPDFにし、書籍ごとのPDFをまとめてDriveへ保存できます。1書籍につき1つの証憑PDFを登録できます。</p>
+                <section class="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                    <h4 class="font-semibold text-slate-800">① 書籍と証憑情報</h4>
+                    <label class="block text-xs font-semibold text-slate-600" for="evidence-scan-book">対象書籍</label>
+                    <select id="evidence-scan-book" onchange="updateEvidenceScanBookFields()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"></select>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <label class="text-xs font-semibold text-slate-600">仕入日
+                            <input type="date" id="evidence-scan-date" class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </label>
+                        <label class="text-xs font-semibold text-slate-600">仕入合計（税込）
+                            <input type="number" id="evidence-scan-total" min="0" class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </label>
+                        <label class="text-xs font-semibold text-slate-600">仕入先
+                            <input type="text" id="evidence-scan-supplier" class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </label>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <label for="evidence-scan-type" class="text-xs font-semibold text-slate-600">種類</label>
+                        <select id="evidence-scan-type" onchange="updateEvidenceScanTypeUI()" class="px-2 py-1.5 border border-slate-300 rounded-lg text-sm bg-white">
+                            <option value="領収書">領収書</option>
+                            <option value="レシート">レシート</option>
+                            <option value="請求書">請求書</option>
+                            <option value="納品書">納品書</option>
+                            <option value="その他">その他</option>
+                        </select>
+                        <input type="text" id="evidence-scan-type-other" maxlength="40" placeholder="種類を入力" class="hidden min-w-0 flex-1 px-2 py-1.5 border border-slate-300 rounded-lg text-sm bg-white">
+                    </div>
+                </section>
+                <section class="rounded-xl border border-slate-200 p-4 space-y-3">
+                    <h4 class="font-semibold text-slate-800">② ページを撮影・追加</h4>
+                    <p class="text-xs text-slate-500">スマートフォンではカメラが開きます。複数ページはページごとに撮影し、選択後に順番を確認してください。</p>
+                    <input type="file" id="evidence-scan-images" accept="image/*" capture="environment" multiple class="block w-full text-sm text-slate-600" onchange="addEvidenceScanPages(this)">
+                    <div id="evidence-scan-page-list" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
+                    <button type="button" onclick="addEvidenceScanToQueue()" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold">
+                        この証憑を待ち行列に追加
+                    </button>
+                </section>
+                <section class="rounded-xl border border-slate-200 p-4 space-y-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <h4 class="font-semibold text-slate-800">③ アップロード待ち行列</h4>
+                        <button type="button" id="evidence-scan-upload-button" onclick="uploadEvidenceScanQueue()" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold disabled:opacity-50" disabled>一括アップロード</button>
+                    </div>
+                    <div id="evidence-scan-queue" class="space-y-2 text-sm text-slate-500">待ち行列は空です。</div>
+                    <p id="evidence-scan-status" class="text-xs text-slate-500"></p>
+                </section>
+            </div>
+            <div class="px-5 py-3 border-t border-slate-200 flex justify-end shrink-0">
+                <button type="button" onclick="closeEvidenceScannerModal()" class="px-4 py-2 border border-slate-300 text-slate-600 rounded-lg text-sm">閉じる</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Barcode Print Modal -->
     <div id="barcode-modal" class="fixed inset-0 modal-backdrop z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center space-y-4">
@@ -911,6 +980,9 @@ body {
         let syncInProgress = false;
         let syncRequestedAgain = false;
         let syncDebounceTimer = null;
+        let evidenceScanPages = [];
+        let evidenceScanQueue = [];
+        let evidenceScanUploadInProgress = false;
 
         window.addEventListener('DOMContentLoaded', () => {
             loadFromLocalStorage();
@@ -1935,6 +2007,364 @@ body {
             } finally {
                 uploadButton.disabled = false;
             }
+        }
+
+        function openEvidenceScannerModal() {
+            const bookSelect = document.getElementById('evidence-scan-book');
+            const currentValue = bookSelect.value;
+            bookSelect.innerHTML = '<option value="">書籍を選択してください</option>' +
+                booksData.map(book =>
+                    `<option value="${escapeHtml(String(book.ID || ''))}">${escapeHtml(String(book.ID || ''))} - ${escapeHtml(String(book.書名 || '名称未設定'))}</option>`
+                ).join('');
+            if (booksData.some(book => String(book.ID) === currentValue)) {
+                bookSelect.value = currentValue;
+            } else if (booksData.length) {
+                bookSelect.value = String(booksData[0].ID);
+            }
+            updateEvidenceScanBookFields();
+            renderEvidenceScanPages();
+            renderEvidenceScanQueue();
+            document.getElementById('evidence-scanner-modal').classList.remove('hidden');
+        }
+
+        function closeEvidenceScannerModal() {
+            if (evidenceScanUploadInProgress) return;
+            document.getElementById('evidence-scanner-modal').classList.add('hidden');
+        }
+
+        function updateEvidenceScanBookFields() {
+            const bookId = document.getElementById('evidence-scan-book').value;
+            const book = booksData.find(item => String(item.ID) === bookId);
+            document.getElementById('evidence-scan-date').value = String(book?.仕入日 || '');
+            const total = Number(book?.仕入合計);
+            document.getElementById('evidence-scan-total').value = Number.isFinite(total)
+                ? total
+                : Math.max(0, (Number(book?.仕入値) || 0) * (Number(book?.仕入数) || 0) + (Number(book?.仕入送料) || 0));
+            document.getElementById('evidence-scan-supplier').value = String(book?.仕入先 || '');
+        }
+
+        function updateEvidenceScanTypeUI() {
+            const isOther = document.getElementById('evidence-scan-type').value === 'その他';
+            const input = document.getElementById('evidence-scan-type-other');
+            input.classList.toggle('hidden', !isOther);
+            if (!isOther) input.value = '';
+        }
+
+        function addEvidenceScanPages(fileInput) {
+            const files = Array.from(fileInput.files || []);
+            fileInput.value = '';
+            const images = files.filter(file => file.type.startsWith('image/'));
+            if (images.length !== files.length) {
+                alert('画像ファイルを選択してください。');
+            }
+            if (evidenceScanPages.length + images.length > 20) {
+                alert('1つの証憑につき、撮影ページは20ページまでです。');
+                return;
+            }
+            evidenceScanPages.push(...images);
+            renderEvidenceScanPages();
+        }
+
+        function renderEvidenceScanPages() {
+            const container = document.getElementById('evidence-scan-page-list');
+            container.replaceChildren();
+            evidenceScanPages.forEach((file, index) => {
+                const preview = document.createElement('div');
+                preview.className = 'relative border border-slate-200 rounded-lg overflow-hidden bg-slate-100';
+                const image = document.createElement('img');
+                image.src = URL.createObjectURL(file);
+                image.alt = `撮影ページ ${index + 1}`;
+                image.className = 'w-full h-28 object-contain';
+                image.onload = () => URL.revokeObjectURL(image.src);
+                const caption = document.createElement('div');
+                caption.className = 'flex items-center justify-between px-2 py-1 text-xs';
+                const label = document.createElement('span');
+                label.textContent = `ページ ${index + 1}`;
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.className = 'text-red-600 hover:text-red-800';
+                remove.textContent = '削除';
+                remove.setAttribute('aria-label', `ページ ${index + 1}を削除`);
+                remove.addEventListener('click', () => {
+                    evidenceScanPages.splice(index, 1);
+                    renderEvidenceScanPages();
+                });
+                caption.append(label, remove);
+                preview.append(image, caption);
+                container.append(preview);
+            });
+        }
+
+        function addEvidenceScanToQueue() {
+            const bookId = document.getElementById('evidence-scan-book').value;
+            const book = booksData.find(item => String(item.ID) === bookId);
+            if (!book) {
+                alert('対象の書籍を選択してください。');
+                return;
+            }
+            if (!evidenceScanPages.length) {
+                alert('証憑のページを撮影または選択してください。');
+                return;
+            }
+            if (evidenceScanQueue.some(item => item.bookId === bookId && item.status !== 'uploaded')) {
+                alert('この書籍はすでに待ち行列にあります。1書籍につき1つのPDFを登録してください。');
+                return;
+            }
+            const purchaseDate = document.getElementById('evidence-scan-date').value;
+            const supplier = document.getElementById('evidence-scan-supplier').value.trim();
+            const purchaseTotal = Number(document.getElementById('evidence-scan-total').value);
+            const selectedType = document.getElementById('evidence-scan-type').value;
+            const evidenceType = selectedType === 'その他'
+                ? document.getElementById('evidence-scan-type-other').value.trim()
+                : selectedType;
+            if (!purchaseDate || !supplier || !Number.isFinite(purchaseTotal) || purchaseTotal < 0 || !evidenceType) {
+                alert('仕入日、仕入合計、仕入先、証憑の種類を確認してください。');
+                return;
+            }
+            const existingEvidence = parseEvidenceValue(book['証憑']);
+            if (existingEvidence.fileId && !confirm('この書籍にはすでにPDF証憑があります。新しいPDFに差し替えますか？')) {
+                return;
+            }
+            evidenceScanQueue.push({
+                bookId,
+                title: String(book.書名 || '名称未設定'),
+                pages: evidenceScanPages.slice(),
+                purchaseDate,
+                purchaseTotal: Math.round(purchaseTotal),
+                supplier,
+                evidenceType,
+                status: 'pending',
+                error: ''
+            });
+            evidenceScanPages = [];
+            renderEvidenceScanPages();
+            renderEvidenceScanQueue();
+            document.getElementById('evidence-scan-status').textContent = '証憑を待ち行列に追加しました。次の書籍を選んでスキャンできます。';
+            if (booksData.length > 1) {
+                const currentIndex = booksData.findIndex(item => String(item.ID) === bookId);
+                const nextBook = booksData.slice(currentIndex + 1).concat(booksData.slice(0, currentIndex))
+                    .find(item => !evidenceScanQueue.some(queued => queued.bookId === String(item.ID) && queued.status !== 'uploaded'));
+                if (nextBook) {
+                    document.getElementById('evidence-scan-book').value = String(nextBook.ID);
+                    updateEvidenceScanBookFields();
+                }
+            }
+        }
+
+        function renderEvidenceScanQueue() {
+            const container = document.getElementById('evidence-scan-queue');
+            const uploadButton = document.getElementById('evidence-scan-upload-button');
+            const pending = evidenceScanQueue.some(item => item.status !== 'uploaded');
+            uploadButton.disabled = evidenceScanUploadInProgress || !pending;
+            if (!evidenceScanQueue.length) {
+                container.textContent = '待ち行列は空です。';
+                return;
+            }
+            container.replaceChildren(...evidenceScanQueue.map((item, index) => {
+                const row = document.createElement('div');
+                row.className = 'flex flex-wrap items-center justify-between gap-2 border border-slate-200 rounded-lg p-3';
+                const details = document.createElement('div');
+                details.className = 'min-w-0';
+                const title = document.createElement('div');
+                title.className = 'font-semibold text-slate-800 truncate';
+                title.textContent = `${item.bookId} - ${item.title}`;
+                const metadata = document.createElement('div');
+                metadata.className = 'text-xs text-slate-500';
+                metadata.textContent = `${item.purchaseDate.replace(/-/g, '')}_${item.purchaseTotal}_${item.supplier}_${item.evidenceType}.pdf ・ ${item.pages.length}ページ`;
+                const status = document.createElement('div');
+                status.className = item.status === 'error' ? 'text-xs text-red-600' : 'text-xs text-emerald-700';
+                status.textContent = item.status === 'uploaded' ? 'アップロード済み' : item.status === 'uploading' ? 'アップロード中…' : item.error || '待機中';
+                details.append(title, metadata, status);
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.className = 'text-xs text-red-600 hover:text-red-800 disabled:opacity-50';
+                remove.textContent = item.status === 'uploaded' ? '一覧から削除' : '取り消す';
+                remove.disabled = evidenceScanUploadInProgress;
+                remove.addEventListener('click', () => {
+                    evidenceScanQueue.splice(index, 1);
+                    renderEvidenceScanQueue();
+                });
+                row.append(details, remove);
+                return row;
+            }));
+        }
+
+        function readImageAsJpeg(file) {
+            return new Promise((resolve, reject) => {
+                const image = new Image();
+                const url = URL.createObjectURL(file);
+                image.onload = () => {
+                    const scale = Math.min(1, 1600 / Math.max(image.naturalWidth, image.naturalHeight));
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+                    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+                    const context = canvas.getContext('2d');
+                    if (!context) {
+                        URL.revokeObjectURL(url);
+                        reject(new Error('画像を処理できませんでした。'));
+                        return;
+                    }
+                    context.fillStyle = '#ffffff';
+                    context.fillRect(0, 0, canvas.width, canvas.height);
+                    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+                    URL.revokeObjectURL(url);
+                    canvas.toBlob(blob => {
+                        if (!blob) {
+                            reject(new Error('画像をJPEGに変換できませんでした。'));
+                            return;
+                        }
+                        blob.arrayBuffer().then(buffer => resolve({
+                            bytes: new Uint8Array(buffer),
+                            width: canvas.width,
+                            height: canvas.height
+                        }), reject);
+                    }, 'image/jpeg', 0.78);
+                };
+                image.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    reject(new Error('撮影画像を開けませんでした。'));
+                };
+                image.src = url;
+            });
+        }
+
+        function asciiBytes(value) {
+            return Uint8Array.from(value, char => char.charCodeAt(0) & 0xff);
+        }
+
+        function concatenateBytes(chunks) {
+            const length = chunks.reduce((total, chunk) => total + chunk.length, 0);
+            const result = new Uint8Array(length);
+            let offset = 0;
+            chunks.forEach(chunk => {
+                result.set(chunk, offset);
+                offset += chunk.length;
+            });
+            return result;
+        }
+
+        async function createEvidencePdf(files) {
+            const pages = [];
+            for (const file of files) pages.push(await readImageAsJpeg(file));
+            const objectChunks = [];
+            const pageCount = pages.length;
+            const objects = new Array(2 + pageCount * 3);
+            const kids = pages.map((_, index) => `${3 + index * 3} 0 R`).join(' ');
+            objects[0] = asciiBytes('<< /Type /Catalog /Pages 2 0 R >>');
+            objects[1] = asciiBytes(`<< /Type /Pages /Kids [${kids}] /Count ${pageCount} >>`);
+
+            pages.forEach((page, index) => {
+                const pageObject = 3 + index * 3;
+                const contentObject = pageObject + 1;
+                const imageObject = pageObject + 2;
+                const pageWidth = 595.28;
+                const pageHeight = 841.89;
+                const scale = Math.min(555 / page.width, 802 / page.height);
+                const width = page.width * scale;
+                const height = page.height * scale;
+                const x = (pageWidth - width) / 2;
+                const y = (pageHeight - height) / 2;
+                const content = `q ${width.toFixed(2)} 0 0 ${height.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm /Im0 Do Q`;
+                objects[pageObject - 1] = asciiBytes(
+                    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /XObject << /Im0 ${imageObject} 0 R >> >> /Contents ${contentObject} 0 R >>`
+                );
+                objects[contentObject - 1] = asciiBytes(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+                objects[imageObject - 1] = concatenateBytes([
+                    asciiBytes(`<< /Type /XObject /Subtype /Image /Width ${page.width} /Height ${page.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${page.bytes.length} >>\nstream\n`),
+                    page.bytes,
+                    asciiBytes('\nendstream')
+                ]);
+            });
+
+            const chunks = [asciiBytes('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n')];
+            const offsets = [0];
+            let totalLength = chunks[0].length;
+            objects.forEach((object, index) => {
+                offsets.push(totalLength);
+                const chunk = concatenateBytes([
+                    asciiBytes(`${index + 1} 0 obj\n`),
+                    object,
+                    asciiBytes('\nendobj\n')
+                ]);
+                chunks.push(chunk);
+                totalLength += chunk.length;
+            });
+            const xrefOffset = totalLength;
+            let xref = `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+            offsets.slice(1).forEach(offset => {
+                xref += `${String(offset).padStart(10, '0')} 00000 n \n`;
+            });
+            xref += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+            chunks.push(asciiBytes(xref));
+            return new Blob([concatenateBytes(chunks)], { type: 'application/pdf' });
+        }
+
+        async function uploadEvidenceScanQueue() {
+            if (evidenceScanUploadInProgress) return;
+            const pendingItems = evidenceScanQueue.filter(item => item.status !== 'uploaded');
+            if (!pendingItems.length) return;
+            evidenceScanUploadInProgress = true;
+            document.getElementById('evidence-scan-status').textContent = 'アップロードしています。画面を閉じないでください。';
+            renderEvidenceScanQueue();
+            let completed = 0;
+
+            for (const item of pendingItems) {
+                item.status = 'uploading';
+                item.error = '';
+                renderEvidenceScanQueue();
+                try {
+                    const pdf = await createEvidencePdf(item.pages);
+                    if (pdf.size > 10 * 1024 * 1024) {
+                        throw new Error('作成したPDFが10MBを超えています。ページ数を減らすか、画像サイズを小さくしてください。');
+                    }
+                    const dataUrl = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(String(reader.result || ''));
+                        reader.onerror = () => reject(new Error('作成したPDFを読み取れませんでした。'));
+                        reader.readAsDataURL(pdf);
+                    });
+                    const base64 = dataUrl.split(',')[1];
+                    if (!base64) throw new Error('作成したPDFを読み取れませんでした。');
+
+                    const result = await postAppsScriptRequest({
+                        action: 'uploadEvidence',
+                        bookId: item.bookId,
+                        fileName: `${item.bookId}.pdf`,
+                        purchaseDate: item.purchaseDate.replace(/-/g, ''),
+                        purchaseTotal: item.purchaseTotal,
+                        supplier: item.supplier,
+                        evidenceType: item.evidenceType,
+                        base64
+                    });
+                    if (!result.evidence || !result.evidence.fileId) {
+                        throw new Error('保存結果にDriveファイルIDがありません。Code.gsのデプロイ内容を確認してください。');
+                    }
+                    const book = booksData.find(record => String(record.ID) === item.bookId);
+                    if (!book) throw new Error('アップロード後に対象書籍が見つかりません。');
+                    const existing = parseEvidenceValue(book['証憑']);
+                    book['証憑'] = `[DRIVE_FILE:${result.evidence.fileId}]${existing.reference ? `\n${existing.reference}` : ''}`;
+                    saveToLocalStorage();
+                    item.status = 'uploaded';
+                    item.error = result.evidence.fileName;
+                    completed++;
+                } catch (error) {
+                    console.error(`証憑スキャンのアップロード失敗（${item.bookId}）:`, error);
+                    item.status = 'error';
+                    item.error = error.message || 'アップロードに失敗しました。';
+                }
+                renderEvidenceScanQueue();
+            }
+
+            evidenceScanUploadInProgress = false;
+            if (completed) {
+                renderTable();
+                scheduleGoogleSheetsSync();
+            }
+            const failures = pendingItems.length - completed;
+            document.getElementById('evidence-scan-status').textContent = failures
+                ? `${completed}件を保存、${failures}件が失敗しました。失敗した項目は再試行できます。`
+                : `${completed}件の証憑PDFを保存しました。`;
+            renderEvidenceScanQueue();
         }
 
         function closeBookModal() {
