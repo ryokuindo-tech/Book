@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>損益計算書 | 書籍管理システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-800 antialiased" data-app-url="<?= WEB_APP_URL ?>">
+    <header class="sticky top-0 z-10 bg-slate-900 text-white shadow-md">
+        <div class="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center gap-3">
+                <div class="rounded-xl bg-indigo-600 p-2.5"><i class="fa-solid fa-book-bookmark text-xl"></i></div>
+                <div>
+                    <h1 class="text-lg font-bold">損益計算書</h1>
+                    <p class="text-xs text-slate-400">書籍管理システム・税込ベース</p>
+                </div>
+            </div>
+            <a href="./index.html" class="flex items-center gap-2 rounded-xl bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white shadow transition hover:bg-indigo-500">
+                <i class="fa-solid fa-arrow-left"></i>
+                <span class="hidden sm:inline">書籍一覧へ戻る</span>
+            </a>
+        </div>
+    </header>
+
+    <main class="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+        <section class="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+            <p class="font-semibold">集計ルール</p>
+            <p class="mt-1">売上日がある販売データを年・月に集計します。売上原価は売れた冊数分の仕入合計を仕入数で按分し、販売管理費は発送費用と決済手数料を合算します。金額は税込です。</p>
+            <p class="mt-1 text-xs text-blue-800">その他の販売管理費入力は未実装のため含まれません。仕入送料は、書籍ごとに割り振った仕入合計を使います。</p>
+        </section>
+
+        <section id="missing-date-warning" class="hidden rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" role="status"></section>
+
+        <section class="grid grid-cols-2 gap-3 md:grid-cols-5">
+            <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <p class="text-xs font-semibold text-slate-500">売上（税込）</p>
+                <p id="total-sales" class="mt-2 text-xl font-bold">¥0</p>
+            </article>
+            <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <p class="text-xs font-semibold text-slate-500">売上原価（税込）</p>
+                <p id="total-cogs" class="mt-2 text-xl font-bold">¥0</p>
+            </article>
+            <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <p class="text-xs font-semibold text-slate-500">売上総利益（粗利）</p>
+                <p id="total-gross-profit" class="mt-2 text-xl font-bold text-emerald-700">¥0</p>
+            </article>
+            <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <p class="text-xs font-semibold text-slate-500">販売管理費</p>
+                <p id="total-expenses" class="mt-2 text-xl font-bold">¥0</p>
+                <p class="mt-1 text-[11px] text-slate-500">発送費用＋決済手数料</p>
+            </article>
+            <article class="col-span-2 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm md:col-span-1">
+                <p class="text-xs font-semibold text-indigo-700">営業利益</p>
+                <p id="total-operating-profit" class="mt-2 text-xl font-bold text-indigo-800">¥0</p>
+            </article>
+        </section>
+
+        <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-4 sm:p-5">
+                <div>
+                    <h2 class="font-bold text-slate-800">年別・月別損益</h2>
+                    <p class="mt-1 text-xs text-slate-500">年度行を押すと、その年の月別内訳が開きます。</p>
+                </div>
+                <button type="button" onclick="renderProfitLoss()" class="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                    <i class="fa-solid fa-rotate mr-1"></i>再読み込み
+                </button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full min-w-[980px] border-collapse text-left text-sm">
+                    <thead class="border-b border-slate-200 bg-slate-100 text-xs font-semibold text-slate-600">
+                        <tr>
+                            <th class="px-4 py-3">期間</th>
+                            <th class="px-4 py-3 text-right">売上（税込）</th>
+                            <th class="px-4 py-3 text-right">売上原価（税込）</th>
+                            <th class="px-4 py-3 text-right">売上総利益（粗利）</th>
+                            <th class="px-4 py-3 text-right">発送費用</th>
+                            <th class="px-4 py-3 text-right">決済手数料</th>
+                            <th class="px-4 py-3 text-right">販売管理費</th>
+                            <th class="px-4 py-3 text-right">営業利益</th>
+                        </tr>
+                    </thead>
+                    <tbody id="profit-loss-table" class="divide-y divide-slate-200"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <footer class="text-center text-xs text-slate-500">
+            <p id="report-status" role="status" aria-live="polite"></p>
+            <p class="mt-1">このページはブラウザーに保存されたアプリ内データを集計します。データ同期後に再読み込みしてください。</p>
+        </footer>
+    </main>
+
+    <script>
+        const STORAGE_KEY = 'book_inventory_excel_v6';
+
+        function amount(value) {
+            const number = Number(value);
+            return Number.isFinite(number) ? number : 0;
+        }
+
+        function yen(value) {
+            return `¥${Math.round(value).toLocaleString('ja-JP')}`;
+        }
+
+        function calculateSales(book) {
+            const salesQuantity = Math.max(0, amount(book['売上数']));
+            return salesQuantity * (
+                amount(book['販売価格']) +
+                amount(book['販売送料'])
+            );
+        }
+
+        function calculatePurchaseTotal(book, purchaseQuantity) {
+            const stored = book['仕入合計'];
+            if (stored !== undefined && stored !== null && stored !== '' && Number.isFinite(Number(stored))) {
+                return Math.max(0, Number(stored));
+            }
+            return Math.max(0,
+                amount(book['仕入値']) * purchaseQuantity +
+                amount(book['仕入送料'])
+            );
+        }
+
+        function validSaleMonth(value) {
+            const match = String(value || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (!match) return '';
+            const year = Number(match[1]);
+            const month = Number(match[2]);
+            const day = Number(match[3]);
+            const date = new Date(year, month - 1, day);
+            if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return '';
+            return `${match[1]}-${match[2]}`;
+        }
+
+        function newTotals() {
+            return { sales: 0, cogs: 0, grossProfit: 0, shipping: 0, fees: 0, expenses: 0, operatingProfit: 0, quantity: 0 };
+        }
+
+        function addSale(totals, book) {
+            const quantity = Math.max(0, amount(book['売上数']));
+            const purchaseQuantity = Math.max(0, amount(book['仕入数']));
+            const sales = calculateSales(book);
+            const purchaseTotal = calculatePurchaseTotal(book, purchaseQuantity);
+            const cogs = purchaseQuantity > 0 ? purchaseTotal * quantity / purchaseQuantity : 0;
+            const shipping = Math.max(0, amount(book['発送費用']));
+            const fees = Math.max(0, amount(book['決済手数料']));
+            const grossProfit = sales - cogs;
+            const expenses = shipping + fees;
+
+            totals.sales += sales;
+            totals.cogs += cogs;
+            totals.grossProfit += grossProfit;
+            totals.shipping += shipping;
+            totals.fees += fees;
+            totals.expenses += expenses;
+            totals.operatingProfit += grossProfit - expenses;
+            totals.quantity += quantity;
+        }
+
+        function formatCells(data) {
+            return `
+                <td class="whitespace-nowrap px-4 py-3 text-right font-mono">${yen(data.sales)}</td>
+                <td class="whitespace-nowrap px-4 py-3 text-right font-mono text-slate-600">${yen(data.cogs)}</td>
+                <td class="whitespace-nowrap px-4 py-3 text-right font-mono font-semibold text-emerald-700">${yen(data.grossProfit)}</td>
+                <td class="whitespace-nowrap px-4 py-3 text-right font-mono">${yen(data.shipping)}</td>
+                <td class="whitespace-nowrap px-4 py-3 text-right font-mono">${yen(data.fees)}</td>
+                <td class="whitespace-nowrap px-4 py-3 text-right font-mono">${yen(data.expenses)}</td>
+                <td class="whitespace-nowrap px-4 py-3 text-right font-mono font-bold text-indigo-700">${yen(data.operatingProfit)}</td>
+            `;
+        }
+
+        function toggleReportYear(year) {
+            const rows = document.querySelectorAll(`.month-of-${year}`);
+            const icon = document.getElementById(`year-icon-${year}`);
+            const willOpen = rows.length > 0 && rows[0].classList.contains('hidden');
+            rows.forEach(row => row.classList.toggle('hidden', !willOpen));
+            if (icon) {
+                icon.classList.toggle('fa-chevron-right', !willOpen);
+                icon.classList.toggle('fa-chevron-down', willOpen);
+            }
+        }
+
+        function renderProfitLoss() {
+            const tbody = document.getElementById('profit-loss-table');
+            const raw = localStorage.getItem(STORAGE_KEY);
+            let books;
+            try {
+                books = raw ? JSON.parse(raw) : [];
+            } catch (error) {
+                console.error('損益データを読み取れません:', error);
+                document.getElementById('report-status').textContent = '保存データを読み取れません。書籍一覧ページでデータを確認してください。';
+                tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-red-600">データを読み込めません</td></tr>';
+                return;
+            }
+            if (!Array.isArray(books)) {
+                document.getElementById('report-status').textContent = '保存データの形式が正しくありません。';
+                tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-red-600">データ形式エラー</td></tr>';
+                return;
+            }
+
+            const years = new Map();
+            const allTotals = newTotals();
+            let undatedCount = 0;
+            let undatedSales = 0;
+            let missingPurchaseQuantityCount = 0;
+
+            books.forEach(book => {
+                const quantity = Math.max(0, amount(book['売上数']));
+                if (!quantity) return;
+                const month = validSaleMonth(book['売上日']);
+                if (!month) {
+                    undatedCount++;
+                    undatedSales += calculateSales(book);
+                    return;
+                }
+                const year = month.slice(0, 4);
+                if (!years.has(year)) years.set(year, new Map());
+                const months = years.get(year);
+                if (!months.has(month)) months.set(month, newTotals());
+                const monthTotals = months.get(month);
+                addSale(monthTotals, book);
+                addSale(allTotals, book);
+                if (amount(book['仕入数']) <= 0) missingPurchaseQuantityCount++;
+            });
+
+            document.getElementById('total-sales').textContent = yen(allTotals.sales);
+            document.getElementById('total-cogs').textContent = yen(allTotals.cogs);
+            document.getElementById('total-gross-profit').textContent = yen(allTotals.grossProfit);
+            document.getElementById('total-expenses').textContent = yen(allTotals.expenses);
+            document.getElementById('total-operating-profit').textContent = yen(allTotals.operatingProfit);
+
+            const warnings = [];
+            if (undatedCount) warnings.push(`売上日が未入力または不正な販売データが${undatedCount}件（売上 ${yen(undatedSales)}）あります。損益表には計上していません。`);
+            if (missingPurchaseQuantityCount) warnings.push(`仕入数が0の販売データが${missingPurchaseQuantityCount}件あり、売上原価を0円として計算しました。`);
+            const warning = document.getElementById('missing-date-warning');
+            warning.textContent = warnings.join(' ');
+            warning.classList.toggle('hidden', warnings.length === 0);
+            warning.classList.toggle('border-amber-300', warnings.length > 0);
+            warning.classList.toggle('bg-amber-50', warnings.length > 0);
+            warning.classList.toggle('text-amber-900', warnings.length > 0);
+
+            tbody.replaceChildren();
+            const sortedYears = Array.from(years.keys()).sort().reverse();
+            if (!sortedYears.length) {
+                tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">売上日と売上数が入力された販売データがありません。</td></tr>';
+            } else {
+                sortedYears.forEach(year => {
+                    const months = years.get(year);
+                    const yearTotals = newTotals();
+                    months.forEach(monthTotals => {
+                        Object.keys(yearTotals).forEach(key => yearTotals[key] += monthTotals[key]);
+                    });
+                    const yearRow = document.createElement('tr');
+                    yearRow.className = 'cursor-pointer border-t-2 border-slate-200 bg-slate-50 font-bold text-slate-800 hover:bg-slate-100';
+                    yearRow.setAttribute('aria-expanded', 'false');
+                    yearRow.addEventListener('click', () => {
+                        const isOpen = yearRow.getAttribute('aria-expanded') === 'true';
+                        yearRow.setAttribute('aria-expanded', String(!isOpen));
+                        toggleReportYear(year);
+                    });
+                    yearRow.innerHTML = `
+                        <td class="whitespace-nowrap px-4 py-3"><i id="year-icon-${year}" class="fa-solid fa-chevron-right mr-2 text-xs text-indigo-600"></i>${year}年（年間合計）</td>
+                        ${formatCells(yearTotals)}
+                    `;
+                    tbody.append(yearRow);
+                    Array.from(months.keys()).sort().reverse().forEach(month => {
+                        const row = document.createElement('tr');
+                        row.className = `month-of-${year} hidden border-b border-slate-100 bg-white text-sm hover:bg-slate-50`;
+                        row.innerHTML = `<td class="whitespace-nowrap px-4 py-2.5 pl-10 text-slate-700">${month.replace('-', '年 ')}月</td>${formatCells(months.get(month))}`;
+                        tbody.append(row);
+                    });
+                });
+            }
+            document.getElementById('report-status').textContent = `${books.length.toLocaleString('ja-JP')}件の書籍データから集計しました。`;
+        }
+
+        renderProfitLoss();
+    </script>
+</body>
+</html>
