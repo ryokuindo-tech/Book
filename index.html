@@ -1709,7 +1709,7 @@ body {
             let bookData = null;
 
             try {
-                const res = await fetch(`https://api.openbd.jp/v1/get?isbn=${cleanIsbn}`);
+                const res = await fetch('https://api.openbd.jp/v1/get?isbn=' + encodeURIComponent(cleanIsbn));
                 const data = await res.json();
                 if (data && data[0] && data[0].summary) {
                     const summary = data[0].summary;
@@ -1738,7 +1738,7 @@ body {
 
             if (!bookData) {
                 try {
-                    const res = await fetch(`https://ndlsearch.ndl.go.jp/api/opensearch?isbn=${cleanIsbn}`);
+                    const res = await fetch('https://ndlsearch.ndl.go.jp/api/opensearch?isbn=' + encodeURIComponent(cleanIsbn));
                     const text = await res.text();
                     const parser = new DOMParser();
                     const xml = parser.parseFromString(text, "application/xml");
@@ -1762,7 +1762,7 @@ body {
 
             if (!bookData) {
                 try {
-                    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanIsbn}`);
+                    const res = await fetch('https://www.googleapis.com/books/v1/volumes?q=isbn:' + encodeURIComponent(cleanIsbn));
                     const data = await res.json();
                     if (data && data.items && data.items.length > 0) {
                         const volumeInfo = data.items[0].volumeInfo;
@@ -2013,12 +2013,15 @@ body {
                 if (document.getElementById('field-ID').value.trim() !== bookId) {
                     throw new Error('PDFはDriveに保存されましたが、フォームの書籍が切り替わったため添付できませんでした。対象の書籍を開き直してPDFを選択してください。');
                 }
-                updateEvidencePdfLink(result.evidence.fileId, `Drive保存済み。書籍情報を保存すると添付されます: ${result.evidence.fileName}`);
+                updateEvidencePdfLink(
+                    result.evidence.fileId,
+                    'Drive保存済み。書籍情報を保存すると添付されます: ' + result.evidence.fileName
+                );
             } catch (error) {
                 console.error('証憑PDFの保存エラー:', error);
                 updateEvidencePdfLink(
                     document.getElementById('field-証憑ファイルID').value,
-                    `エラー: ${error.message || 'PDFを保存できませんでした。'}`
+                    'エラー: ' + (error.message || 'PDFを保存できませんでした。')
                 );
                 alert(error.message || 'PDFをGoogle Driveに保存できませんでした。');
             } finally {
