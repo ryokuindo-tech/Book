@@ -12,8 +12,16 @@ const BOOK_FIELDS = [
 
 function doGet(event) {
   if (event.parameter.action === 'app') {
-    return HtmlService.createHtmlOutputFromFile('Index')
+    const template = HtmlService.createTemplateFromFile('Index');
+    template.WEB_APP_URL = ScriptApp.getService().getUrl();
+    return template.evaluate()
       .setTitle('書籍管理システム');
+  }
+  if (event.parameter.action === 'report') {
+    const template = HtmlService.createTemplateFromFile('Report');
+    template.WEB_APP_URL = ScriptApp.getService().getUrl();
+    return template.evaluate()
+      .setTitle('損益計算書 | 書籍管理システム');
   }
 
   const callback = String(event.parameter.callback || '');
