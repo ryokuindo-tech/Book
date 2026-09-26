@@ -10,14 +10,104 @@ const BOOK_FIELDS = [
   '備考', '証憑', '記入日'
 ];
 
+const SYNC_RESULT_CACHE_PREFIX = 'book-sync-result:';
+const SYNC_RESULT_CHUNK_LENGTH = 20000;
+const SYNC_RESULT_CACHE_TTL_SECONDS = 600;
+
 function doGet(event) {
-  const action = String(event.parameter.action || 'app');
+  const parameters = event && event.parameter ? event.parameter : {};
+  if (parameters.requestId) return getSyncResult_(parameters);
+
+  const action = String(parameters.action || 'app');
   const isReport = action === 'report';
   const template = HtmlService.createTemplateFromFile(isReport ? 'Report' : 'Index');
   template.WEB_APP_URL = ScriptApp.getService().getUrl();
   return template.evaluate()
     .setTitle(isReport ? '損益計算書 | 書籍管理システム' : '書籍管理システム')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+function doPost(event) {
+  const parameters = event && event.parameter ? event.parameter : {};
+  const payloadText = parameters.payload;
+  if (!payloadText) throw new Error('同期データを受信できませんでした。');
+
+  let request;
+  try {
+    request = JSON.parse(payloadText);
+  } catch (error) {
+    throw new Error('同期データの形式が正しくありません。');
+  }
+
+  const requestId = String(request.requestId || '');
+  if (!/^[a-zA-Z0-9_-]{1,100}$/.test(requestId)) {
+    throw new Error('同期リクエストIDが正しくありません。');
+  }
+
+  try {
+    const books = synchronizeBooksFromClient(request);
+    storeSyncResult_(requestId, { ok: true, books: books });
+  } catch (error) {
+    console.error('Googleスプレッドシート同期エラー:', error);
+    storeSyncResult_(requestId, {
+      ok: false,
+      error: error && error.message ? error.message : '同期に失敗しました。'
+    });
+  }
+
+  return ContentService.createTextOutput('同期リクエストを処理しました。');
+}
+
+function getSyncResult_(parameters) {
+  const requestId = String(parameters.requestId || '');
+  const callback = String(parameters.callback || '');
+  if (!/^[a-zA-Z0-9_-]{1,100}$/.test(requestId)) {
+    throw new Error('同期リクエストIDが正しくありません。');
+  }
+  if (!/^bookSyncResult_[a-zA-Z0-9_]+$/.test(callback)) {
+    throw new Error('同期結果のコールバックが正しくありません。');
+  }
+
+  const cache = CacheService.getScriptCache();
+  const result = readSyncResult_(cache, requestId);
+  const json = JSON.stringify(result).replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+  return ContentService.createTextOutput(`${callback}(${json});`)
+    .setMimeType(ContentService.MimeType.JAVASCRIPT);
+}
+
+function storeSyncResult_(requestId, result) {
+  const cache = CacheService.getScriptCache();
+  const serialized = JSON.stringify(result);
+  const chunks = [];
+  for (let offset = 0; offset < serialized.length; offset += SYNC_RESULT_CHUNK_LENGTH) {
+    chunks.push(serialized.slice(offset, offset + SYNC_RESULT_CHUNK_LENGTH));
+  }
+
+  const cacheKeys = chunks.map((chunk, index) => `${SYNC_RESULT_CACHE_PREFIX}${requestId}:${index}`);
+  cache.putAll(
+    Object.fromEntries(chunks.map((chunk, index) => [cacheKeys[index], chunk])),
+    SYNC_RESULT_CACHE_TTL_SECONDS
+  );
+  cache.put(
+    `${SYNC_RESULT_CACHE_PREFIX}${requestId}:meta`,
+    JSON.stringify({ chunkCount: chunks.length }),
+    SYNC_RESULT_CACHE_TTL_SECONDS
+  );
+}
+
+function readSyncResult_(cache, requestId) {
+  const prefix = `${SYNC_RESULT_CACHE_PREFIX}${requestId}:`;
+  const metadata = cache.get(`${prefix}meta`);
+  if (!metadata) return { pending: true };
+
+  const { chunkCount } = JSON.parse(metadata);
+  const chunkKeys = Array.from({ length: chunkCount }, (_, index) => `${prefix}${index}`);
+  const chunks = cache.getAll(chunkKeys);
+  if (chunkKeys.some(key => chunks[key] === undefined)) {
+    return { ok: false, error: '同期結果の保存期間が切れました。もう一度同期してください。' };
+  }
+
+  return JSON.parse(chunkKeys.map(key => chunks[key]).join(''));
 }
 
 function uploadEvidencePdf(request) {
