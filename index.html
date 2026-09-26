@@ -718,8 +718,24 @@ body {
                 </section>
                 <section class="rounded-xl border border-slate-200 p-4 space-y-3">
                     <h4 class="font-semibold text-slate-800">② ページを撮影・追加</h4>
-                    <p class="text-xs text-slate-500">スマートフォンではカメラが開きます。複数ページはページごとに撮影し、選択後に順番を確認してください。</p>
-                    <input type="file" id="evidence-scan-images" accept="image/*" capture="environment" multiple class="block w-full text-sm text-slate-600" onchange="addEvidenceScanPages(this)">
+                    <p class="text-xs text-slate-500">カメラを起動して撮影するか、既存の画像ファイルを選択してください。複数ページは続けて撮影できます。</p>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" id="evidence-camera-start" onclick="startEvidenceCamera()" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold">
+                            <i class="fa-solid fa-video mr-1"></i>カメラを起動
+                        </button>
+                        <button type="button" id="evidence-camera-capture" onclick="captureEvidenceCameraPage()" class="hidden px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold">
+                            <i class="fa-solid fa-camera mr-1"></i>撮影して追加
+                        </button>
+                        <button type="button" id="evidence-camera-stop" onclick="stopEvidenceCamera()" class="hidden px-4 py-2 rounded-lg border border-slate-300 text-slate-600 text-sm">
+                            カメラを停止
+                        </button>
+                    </div>
+                    <div id="evidence-camera-container" class="hidden rounded-lg bg-black overflow-hidden">
+                        <video id="evidence-camera-video" autoplay playsinline muted class="w-full max-h-80 object-contain"></video>
+                    </div>
+                    <p id="evidence-camera-status" class="text-xs text-slate-500"></p>
+                    <label class="block text-xs font-semibold text-slate-600" for="evidence-scan-images">または画像を選択</label>
+                    <input type="file" id="evidence-scan-images" accept="image/*" multiple class="block w-full text-sm text-slate-600" onchange="addEvidenceScanPages(this)">
                     <div id="evidence-scan-page-list" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
                     <button type="button" onclick="addEvidenceScanToQueue()" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold">
                         この証憑を待ち行列に追加
@@ -983,6 +999,8 @@ body {
         let evidenceScanPages = [];
         let evidenceScanQueue = [];
         let evidenceScanUploadInProgress = false;
+        let evidenceCameraStream = null;
+        let evidenceCameraRequestId = 0;
 
         window.addEventListener('DOMContentLoaded', () => {
             loadFromLocalStorage();
@@ -2029,6 +2047,7 @@ body {
 
         function closeEvidenceScannerModal() {
             if (evidenceScanUploadInProgress) return;
+            stopEvidenceCamera();
             document.getElementById('evidence-scanner-modal').classList.add('hidden');
         }
 
@@ -2048,6 +2067,114 @@ body {
             const input = document.getElementById('evidence-scan-type-other');
             input.classList.toggle('hidden', !isOther);
             if (!isOther) input.value = '';
+        }
+
+        async function startEvidenceCamera() {
+            const status = document.getElementById('evidence-camera-status');
+            if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+                status.textContent = 'このブラウザーではカメラを利用できません。HTTPSで開くか、画像を選択してください。';
+                status.className = 'text-xs text-red-600';
+                return;
+            }
+
+            stopEvidenceCamera();
+            const requestId = ++evidenceCameraRequestId;
+            const startButton = document.getElementById('evidence-camera-start');
+            startButton.disabled = true;
+            status.textContent = 'カメラへのアクセスを確認しています…';
+            status.className = 'text-xs text-slate-500';
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: false,
+                    video: {
+                        facingMode: { ideal: 'environment' },
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    }
+                });
+                if (requestId !== evidenceCameraRequestId ||
+                    document.getElementById('evidence-scanner-modal').classList.contains('hidden')) {
+                    stream.getTracks().forEach(track => track.stop());
+                    return;
+                }
+                evidenceCameraStream = stream;
+                const video = document.getElementById('evidence-camera-video');
+                video.srcObject = evidenceCameraStream;
+                await video.play();
+                document.getElementById('evidence-camera-container').classList.remove('hidden');
+                document.getElementById('evidence-camera-start').classList.add('hidden');
+                document.getElementById('evidence-camera-capture').classList.remove('hidden');
+                document.getElementById('evidence-camera-stop').classList.remove('hidden');
+                status.textContent = 'カメラ起動中。ページごとに撮影して追加してください。';
+            } catch (error) {
+                stopEvidenceCamera();
+                const reason = error.name === 'NotAllowedError'
+                    ? 'カメラの使用が許可されていません。ブラウザー設定でカメラを許可してください。'
+                    : error.name === 'NotFoundError'
+                        ? '利用できるカメラが見つかりません。'
+                        : error.name === 'NotReadableError'
+                            ? 'カメラを起動できません。他のアプリが使用中でないか確認してください。'
+                            : !window.isSecureContext
+                                ? 'カメラはHTTPSのページでのみ利用できます。画像を選択するか、HTTPSでアプリを開いてください。'
+                                : `カメラを起動できませんでした: ${error.message || error.name}`;
+                status.textContent = reason;
+                status.className = 'text-xs text-red-600';
+            } finally {
+                if (requestId === evidenceCameraRequestId) startButton.disabled = false;
+            }
+        }
+
+        function stopEvidenceCamera() {
+            evidenceCameraRequestId++;
+            if (evidenceCameraStream) {
+                evidenceCameraStream.getTracks().forEach(track => track.stop());
+                evidenceCameraStream = null;
+            }
+            const video = document.getElementById('evidence-camera-video');
+            if (video) video.srcObject = null;
+            const container = document.getElementById('evidence-camera-container');
+            if (container) container.classList.add('hidden');
+            const startButton = document.getElementById('evidence-camera-start');
+            if (startButton) {
+                startButton.classList.remove('hidden');
+                startButton.disabled = false;
+            }
+            const captureButton = document.getElementById('evidence-camera-capture');
+            if (captureButton) captureButton.classList.add('hidden');
+            const stopButton = document.getElementById('evidence-camera-stop');
+            if (stopButton) stopButton.classList.add('hidden');
+        }
+
+        function captureEvidenceCameraPage() {
+            const video = document.getElementById('evidence-camera-video');
+            if (!evidenceCameraStream || !video.videoWidth || !video.videoHeight) {
+                document.getElementById('evidence-camera-status').textContent = 'カメラ映像が準備できていません。少し待ってから撮影してください。';
+                return;
+            }
+            if (evidenceScanPages.length >= 20) {
+                alert('1つの証憑につき、撮影ページは20ページまでです。');
+                return;
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const context = canvas.getContext('2d');
+            if (!context) {
+                document.getElementById('evidence-camera-status').textContent = '撮影画像を処理できませんでした。';
+                return;
+            }
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob(blob => {
+                if (!blob) {
+                    document.getElementById('evidence-camera-status').textContent = '撮影画像を保存できませんでした。';
+                    return;
+                }
+                const file = new File([blob], `evidence-page-${Date.now()}.jpg`, { type: 'image/jpeg' });
+                evidenceScanPages.push(file);
+                renderEvidenceScanPages();
+                document.getElementById('evidence-camera-status').textContent = `ページ ${evidenceScanPages.length} を撮影しました。続けて次のページを撮影できます。`;
+                document.getElementById('evidence-camera-status').className = 'text-xs text-emerald-700';
+            }, 'image/jpeg', 0.9);
         }
 
         function addEvidenceScanPages(fileInput) {
