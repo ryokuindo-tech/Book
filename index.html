@@ -183,6 +183,16 @@ body {
                         <option value="イベント（BB）">イベント（BB）</option>
                     </select>
 
+                    <button type="button" id="missing-sales-date-filter" onclick="toggleMissingSalesDateFilter()" aria-pressed="false" class="border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 px-3.5 py-2 rounded-xl text-sm font-medium flex items-center space-x-1.5 transition">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span>売上日未記入</span>
+                    </button>
+
+                    <button type="button" id="clear-search-btn" onclick="clearSearchFilters()" disabled class="border border-slate-300 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-slate-700 px-3.5 py-2 rounded-xl text-sm font-medium flex items-center space-x-1.5 transition" title="検索条件をクリア">
+                        <i class="fa-solid fa-xmark"></i>
+                        <span>検索結果をクリア</span>
+                    </button>
+
                     <button onclick="exportCSV()" class="border border-slate-300 hover:bg-slate-50 text-slate-700 px-3.5 py-2 rounded-xl text-sm font-medium flex items-center space-x-1.5 transition">
                         <i class="fa-solid fa-file-csv text-emerald-600 text-base"></i>
                         <span>CSV書き出し</span>
@@ -203,6 +213,7 @@ body {
                     </a>
                 </div>
             </div>
+            <p id="result-count" class="text-xs text-slate-500" aria-live="polite">0冊を表示（全0冊）</p>
         </section>
 
         <!-- 年別・月別 売上・原価・利益レポートセクション（アコーディオン対応） -->
@@ -841,6 +852,7 @@ body {
         let booksData = [];
         let html5QrcodeScanner = null;
         let idSortAscending = true;
+        let missingSalesDateOnly = false;
 
         window.addEventListener('DOMContentLoaded', () => {
             loadFromLocalStorage();
@@ -1077,8 +1089,10 @@ body {
 
                 const matchesStatus = !filterStatus || book.ステータス === filterStatus;
                 const matchesLocation = !filterLocation || book.販売場所 === filterLocation;
+                const matchesMissingSalesDate = !missingSalesDateOnly ||
+                    (status === 'SoldOut' && saleDate === '');
 
-                return matchesSearch && matchesStatus && matchesLocation;
+                return matchesSearch && matchesStatus && matchesLocation && matchesMissingSalesDate;
             });
 
             filteredBooks.sort((a, b) => {
@@ -1092,6 +1106,17 @@ body {
                 const strB = String(b.ID || '');
                 return idSortAscending ? strA.localeCompare(strB) : strB.localeCompare(strA);
             });
+
+            const resultCount = document.getElementById('result-count');
+            if (resultCount) {
+                resultCount.textContent = `${filteredBooks.length.toLocaleString()}冊を表示（全${booksData.length.toLocaleString()}冊）`;
+            }
+            const clearSearchButton = document.getElementById('clear-search-btn');
+            if (clearSearchButton) {
+                clearSearchButton.disabled = !(
+                    rawSearchQuery || filterStatus || filterLocation || missingSalesDateOnly
+                );
+            }
 
             document.getElementById('stat-total-stock').innerHTML = `${totalStock.toLocaleString()} <span class="text-xs font-normal text-slate-500">冊</span>`;
             document.getElementById('stat-stock-value').innerText = `¥${totalStockValue.toLocaleString()}`;
@@ -1206,6 +1231,35 @@ body {
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        function toggleMissingSalesDateFilter() {
+            missingSalesDateOnly = !missingSalesDateOnly;
+            updateMissingSalesDateFilterButton();
+            renderTable();
+        }
+
+        function updateMissingSalesDateFilterButton() {
+            const filterButton = document.getElementById('missing-sales-date-filter');
+            filterButton.setAttribute('aria-pressed', String(missingSalesDateOnly));
+            filterButton.classList.toggle('border-red-200', !missingSalesDateOnly);
+            filterButton.classList.toggle('bg-red-50', !missingSalesDateOnly);
+            filterButton.classList.toggle('hover:bg-red-100', !missingSalesDateOnly);
+            filterButton.classList.toggle('text-red-700', !missingSalesDateOnly);
+            filterButton.classList.toggle('bg-red-700', missingSalesDateOnly);
+            filterButton.classList.toggle('hover:bg-red-800', missingSalesDateOnly);
+            filterButton.classList.toggle('text-white', missingSalesDateOnly);
+            filterButton.classList.toggle('border-red-700', missingSalesDateOnly);
+        }
+
+        function clearSearchFilters() {
+            document.getElementById('search-input').value = '';
+            document.getElementById('filter-status').value = '';
+            document.getElementById('filter-location').value = '';
+            missingSalesDateOnly = false;
+            updateMissingSalesDateFilterButton();
+            renderTable();
+            document.getElementById('search-input').focus();
         }
 
         // 年別・月別集計（アコーディオン対応版）
