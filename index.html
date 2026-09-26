@@ -2034,7 +2034,9 @@ body {
             const currentValue = bookSelect.value;
             bookSelect.innerHTML = '<option value="">書籍を選択してください</option>' +
                 booksData.map(book =>
-                    `<option value="${escapeHtml(String(book.ID || ''))}">${escapeHtml(String(book.ID || ''))} - ${escapeHtml(String(book.書名 || '名称未設定'))}</option>`
+                    '<option value="' + escapeHtml(String(book.ID || '')) + '">' +
+                    escapeHtml(String(book.ID || '')) + ' - ' +
+                    escapeHtml(String(book.書名 || '名称未設定')) + '</option>'
                 ).join('');
             if (booksData.some(book => String(book.ID) === currentValue)) {
                 bookSelect.value = currentValue;
