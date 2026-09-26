@@ -102,6 +102,36 @@ body {
         <!-- Summary Metrics Card -->
         <section class="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center space-x-4">
+                <div class="p-3 bg-teal-50 text-teal-600 rounded-xl">
+                    <i class="fa-solid fa-file-invoice-dollar text-2xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase">売上合計</p>
+                    <p id="stat-conditional-total-sales" class="text-2xl font-bold text-slate-800">¥0</p>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center space-x-4">
+                <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+                    <i class="fa-solid fa-receipt text-2xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase">仕入合計 (税込)</p>
+                    <p id="stat-total-sales" class="text-2xl font-bold text-slate-800">¥0</p>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center space-x-4">
+                <div class="p-3 bg-purple-50 text-purple-600 rounded-xl">
+                    <i class="fa-solid fa-chart-pie text-2xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase">粗利益累計</p>
+                    <p id="stat-total-profit" class="text-2xl font-bold text-slate-800">¥0</p>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center space-x-4">
                 <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
                     <i class="fa-solid fa-boxes-stacked text-2xl"></i>
                 </div>
@@ -118,36 +148,6 @@ body {
                 <div>
                     <p class="text-xs font-semibold text-slate-500 uppercase">総在庫金額</p>
                     <p id="stat-stock-value" class="text-2xl font-bold text-slate-800">¥0</p>
-                </div>
-            </div>
-
-            <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center space-x-4">
-                <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
-                    <i class="fa-solid fa-receipt text-2xl"></i>
-                </div>
-                <div>
-                    <p class="text-xs font-semibold text-slate-500 uppercase">仕入合計 (税込)</p>
-                    <p id="stat-total-sales" class="text-2xl font-bold text-slate-800">¥0</p>
-                </div>
-            </div>
-
-            <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center space-x-4">
-                <div class="p-3 bg-teal-50 text-teal-600 rounded-xl">
-                    <i class="fa-solid fa-file-invoice-dollar text-2xl"></i>
-                </div>
-                <div>
-                    <p class="text-xs font-semibold text-slate-500 uppercase">売上合計</p>
-                    <p id="stat-conditional-total-sales" class="text-2xl font-bold text-slate-800">¥0</p>
-                </div>
-            </div>
-
-            <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex items-center space-x-4">
-                <div class="p-3 bg-purple-50 text-purple-600 rounded-xl">
-                    <i class="fa-solid fa-chart-pie text-2xl"></i>
-                </div>
-                <div>
-                    <p class="text-xs font-semibold text-slate-500 uppercase">粗利益累計</p>
-                    <p id="stat-total-profit" class="text-2xl font-bold text-slate-800">¥0</p>
                 </div>
             </div>
         </section>
@@ -262,8 +262,8 @@ body {
                             <th class="py-2 px-4 text-center">ステータス</th>
                             <th class="py-2 px-4 text-center">売上数</th>
                             <th class="py-2 px-2 w-15">在庫</th>
-                            <th class="py-2 px-4">仕入合計（税込）</th>
                             <th class="py-2 px-4">売上合計（税込）</th>
+                            <th class="py-2 px-4">仕入合計（税込）</th>
                             <th class="py-2 px-4 text-center">粗利益</th>
                             <th class="py-2 px-4 text-center">操作</th>
                         </tr>
@@ -355,12 +355,12 @@ body {
                         <div class="hidden md:block"></div>
 
                         <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">本体価格 (定価)</label>
-                            <input type="number" id="field-本体価格" min="0" oninput="calculateTaxFromListPrice()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
-                        </div>
-                        <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">税込価格 (税込)</label>
                             <input type="number" id="field-税込価格" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">本体価格 (定価)</label>
+                            <input type="number" id="field-本体価格" min="0" oninput="calculateTaxFromListPrice()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">消費税率 (%)</label>
@@ -378,7 +378,7 @@ body {
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">仕入日</label>
-                            <input type="date" id="field-仕入日" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                            <input type="date" id="field-仕入日" onchange="updateDateFieldAppearance(this)" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-400">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">仕入先</label>
@@ -404,24 +404,24 @@ body {
                         <div class="hidden md:block"></div>
 
                         <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">仕入値（税抜）</label>
-                            <input type="number" id="field-仕入値（税抜）" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 text-slate-600 rounded-lg text-sm">
-                        </div>
-                        <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">仕入値 <span class="text-amber-600 font-normal">(税込)</span></label>
                             <input type="number" id="field-仕入値" min="0" value="0" oninput="recalculateAllCalculatedFields()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">仕入値（税抜）</label>
+                            <input type="number" id="field-仕入値（税抜）" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 text-slate-600 rounded-lg text-sm">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">消費税率 (%)</label>
                             <input type="number" id="field-仕入税率" min="0" step="0.1" value="10" oninput="recalculateAllCalculatedFields()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white font-semibold text-slate-700">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">仕入送料（税抜）</label>
-                            <input type="number" id="field-仕入送料（税抜）" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 text-slate-600 rounded-lg text-sm">
-                        </div>
-                        <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">仕入送料（税込）</label>
                             <input type="number" id="field-仕入送料" min="0" value="0" oninput="recalculateAllCalculatedFields()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">仕入送料（税抜）</label>
+                            <input type="number" id="field-仕入送料（税抜）" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 text-slate-600 rounded-lg text-sm">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">消費税率 (%)</label>
@@ -447,11 +447,12 @@ body {
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">登録日</label>
-                            <input type="date" id="field-登録日" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                            <input type="date" id="field-登録日" onchange="updateDateFieldAppearance(this)" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-400">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">販売場所</label>
-                            <select id="field-販売場所" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                            <select id="field-販売場所" onchange="updateSelectFieldAppearance(this)" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-400">
+                                <option value="" disabled selected>選択してください</option>
                                 <option value="店舗（新本）">店舗（新本）</option>
                                 <option value="店舗（古本）">店舗（古本）</option>
                                 <option value="ストアーズ（新本）">ストアーズ（新本）</option>
@@ -466,48 +467,29 @@ body {
                         </div>
                         <div class="hidden md:block"></div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">販売価格 (税抜)</label>
-                            <input type="number" id="field-販売価格（税抜）" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 text-slate-600 rounded-lg text-sm">
-                        </div>
-                        <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">販売価格 (税込)</label>
                             <input type="number" id="field-販売価格" min="0" value="0" oninput="calculateSalesPriceTax()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">販売価格 (税抜)</label>
+                            <input type="number" id="field-販売価格（税抜）" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 text-slate-600 rounded-lg text-sm">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">消費税率 (%)</label>
                             <input type="number" id="field-販売税率" min="0" step="0.1" value="10" oninput="calculateSalesPriceTax()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white font-semibold text-slate-700">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">販売送料 (税抜)</label>
-                            <input type="number" id="field-販売送料（税抜）" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 text-slate-600 rounded-lg text-sm">
-                        </div>
-                        <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">販売送料 (税込) <span class="text-indigo-600 font-normal">(顧客徴収分)</span></label>
                             <input type="number" id="field-販売送料" min="0" value="0" oninput="calculateSalesShippingTax()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">販売送料 (税抜)</label>
+                            <input type="number" id="field-販売送料（税抜）" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 text-slate-600 rounded-lg text-sm">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">消費税率 (%)</label>
                             <input type="number" id="field-販売送料税率" min="0" step="0.1" value="10" oninput="calculateSalesShippingTax()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white font-semibold text-slate-700">
                         </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">売上合計 <span class="text-indigo-600 font-normal">(税込)</span></label>
-                            <input type="number" id="field-売上合計" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 font-bold text-slate-800 rounded-lg text-sm">
-                        </div>
-                        <div class="hidden md:block"></div>
-                        <div class="hidden md:block"></div>
-
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">売上数</label>
-                            <input type="number" id="field-売上数" min="0" value="0" oninput="recalculateAllCalculatedFields()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">在庫数</label>
-                            <input type="number" id="field-在庫数" min="0" value="1" oninput="recalculateAllCalculatedFields()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">在庫金額 (自動)</label>
-                            <input type="number" id="field-在庫金額" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 font-semibold text-slate-700 rounded-lg text-sm">
-                        </div>                        
                     </div>
                 </div>
 
@@ -520,7 +502,7 @@ body {
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">発送手段</label>
-                            <select id="field-発送手段" onchange="updateShippingFee()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                            <select id="field-発送手段" onchange="updateSelectFieldAppearance(this); updateShippingFee()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-400">
                                 <option value="">選択してください</option>
                                 <option value="日本郵便（クリックポスト）">日本郵便（クリックポスト）</option>
                                 <option value="日本郵便（レターパックライト）">日本郵便（レターパックライト）</option>
@@ -550,7 +532,7 @@ body {
 
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">決済手数料名</label>
-                            <select id="field-決済手数料名" onchange="updateSettlementFee()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                            <select id="field-決済手数料名" onchange="updateSelectFieldAppearance(this); updateSettlementFee()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-400">
                                 <option value="">選択してください</option>
                                 <option value="ストアーズネット決済（クレジットカード）">ストアーズネット決済（クレジットカード）</option>
                                 <option value="ストアーズネット決済（コンビニ決済）">ストアーズネット決済（コンビニ決済）</option>
@@ -580,6 +562,27 @@ body {
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">売上数</label>
+                            <input type="number" id="field-売上数" min="0" value="0" oninput="recalculateAllCalculatedFields()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                        </div>
+                        <div id="sales-total-field">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1" for="field-売上合計">売上金額（税込）</label>
+                            <input type="number" id="field-売上合計" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 font-bold text-slate-800 rounded-lg text-sm">
+                            <input type="hidden" id="field-売上合計（税抜）">
+                        </div>
+                        <div class="hidden md:block"></div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">在庫数 (自動)</label>
+                            <input type="number" id="field-在庫数" min="0" value="1" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 text-slate-600 rounded-lg text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">在庫金額</label>
+                            <input type="number" id="field-在庫金額" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 font-semibold text-slate-700 rounded-lg text-sm">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">利益 (粗利)</label>
                             <input type="number" id="field-利益" readonly class="w-full px-3 py-2 border border-slate-200 bg-slate-100 text-emerald-700 font-bold rounded-lg text-sm">
                         </div>
@@ -589,7 +592,7 @@ body {
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">ステータス</label>
-                            <select id="field-ステータス" onchange="checkSoldOutSalesDateWarning()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                            <select id="field-ステータス" onchange="updateStatusInBookForm(this)" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
                                 <option value="販売中">販売中</option>
                                 <option value="SoldOut">SoldOut</option>
                                 <option value="廃棄">廃棄</option>
@@ -598,11 +601,11 @@ body {
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">売上日</label>
-                            <input type="date" id="field-売上日" oninput="checkSoldOutSalesDateWarning()" onchange="checkSoldOutSalesDateWarning()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                            <input type="date" id="field-売上日" oninput="checkSoldOutSalesDateWarning()" onchange="updateDateFieldAppearance(this); checkSoldOutSalesDateWarning()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-400">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">入金日</label>
-                            <input type="date" id="field-入金日" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                            <input type="date" id="field-入金日" onchange="updateDateFieldAppearance(this)" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-400">
                         </div>
                         <div class="hidden md:block"></div>
 
@@ -612,11 +615,34 @@ body {
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">証憑</label>
-                            <input type="text" id="field-証憑" placeholder="領収書No等" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                            <div class="mb-2 flex flex-wrap items-center gap-2">
+                                <label for="evidence-type" class="text-xs text-slate-600">種類</label>
+                                <select id="evidence-type" onchange="updateEvidenceTypeAppearance(this); updateEvidenceTypeUI()" class="px-2 py-1.5 border border-slate-300 rounded-lg text-sm bg-white text-slate-800">
+                                    <option value="領収書" selected>領収書</option>
+                                    <option value="レシート">レシート</option>
+                                    <option value="請求書">請求書</option>
+                                    <option value="納品書">納品書</option>
+                                    <option value="その他">その他</option>
+                                </select>
+                                <input type="text" id="evidence-type-other" placeholder="種類を入力" maxlength="40" class="hidden min-w-0 flex-1 px-2 py-1.5 border border-slate-300 rounded-lg text-sm bg-white">
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <input type="text" id="field-証憑" placeholder="領収書No等" class="min-w-0 flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                                <input type="file" id="evidence-pdf-input" accept="application/pdf,.pdf" class="hidden" onchange="uploadEvidencePdf(this)">
+                                <input type="hidden" id="field-証憑ファイルID">
+                                <button type="button" onclick="document.getElementById('evidence-pdf-input').click()" class="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-50" title="10MB以下のPDF証憑をDriveに保存" aria-label="PDF証憑を選択">
+                                    <i class="fa-solid fa-file-arrow-up"></i>
+                                </button>
+                                <a id="evidence-pdf-link" class="hidden px-2 py-2 text-red-600 hover:text-red-800" target="_blank" rel="noopener noreferrer" title="保存したPDFを開く">
+                                    <i class="fa-solid fa-file-pdf text-lg"></i>
+                                </a>
+                            </div>
+                            <p class="mt-1 text-[11px] text-slate-500">ファイル名: 仕入日_仕入合計_仕入先_種類.pdf</p>
+                            <p id="evidence-upload-status" class="hidden mt-1 text-xs text-slate-500"></p>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">記入日</label>
-                            <input type="date" id="field-記入日" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                            <input type="date" id="field-記入日" onchange="updateDateFieldAppearance(this)" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-400">
                         </div>
                         <div class="md:col-span-3">
                             <label class="block text-xs font-semibold text-slate-600 mb-1">備考</label>
@@ -711,7 +737,7 @@ body {
             "本体価格", "本体税率", "税込価格", "仕入時の状態", "仕入日", "仕入先", "束親", 
             "仕入数", "仕入値", "仕入値（税抜）", "掛率", "仕入送料", "仕入送料（税抜）", 
             "仕入合計", "売上数", "在庫数", "在庫金額", "販売場所", "登録日", 
-            "販売価格", "販売価格（税抜）", "販売税率", "販売送料", "販売送料（税抜）", "販売送料税率", "売上合計", "発送手段", "発送費用", "決済手数料名", 
+            "販売価格", "販売価格（税抜）", "販売税率", "販売送料", "販売送料（税抜）", "販売送料税率", "売上合計", "売上合計（税抜）", "発送手段", "発送費用", "決済手数料名",
             "決済手数料", "利益", "利益率", "売上日", "入金日", "ステータス", 
             "備考", "証憑", "記入日"
         ];
@@ -741,6 +767,30 @@ body {
                 val = `${val}/01`;
             }
             inputElem.value = val;
+        }
+
+        function updateDateFieldAppearance(inputElem) {
+            const isEmpty = !inputElem.value;
+            inputElem.classList.toggle('text-slate-400', isEmpty);
+            inputElem.classList.toggle('text-slate-800', !isEmpty);
+        }
+
+        function updateSelectFieldAppearance(selectElem) {
+            const isEmpty = !selectElem.value;
+            selectElem.classList.toggle('text-slate-400', isEmpty);
+            selectElem.classList.toggle('text-slate-800', !isEmpty);
+        }
+
+        function updateEvidenceTypeAppearance(selectElem) {
+            selectElem.classList.toggle('text-slate-400', !selectElem.value);
+            selectElem.classList.toggle('text-slate-800', Boolean(selectElem.value));
+        }
+
+        function updateEvidenceTypeUI() {
+            const isOther = document.getElementById('evidence-type').value === 'その他';
+            const otherInput = document.getElementById('evidence-type-other');
+            otherInput.classList.toggle('hidden', !isOther);
+            if (!isOther) otherInput.value = '';
         }
 
         function parseToYearMonth(dateStr) {
@@ -884,6 +934,18 @@ body {
                 booksData = [...INITIAL_SAMPLE_BOOKS];
                 saveToLocalStorage();
             }
+            booksData.forEach(updateInventoryFields);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(booksData));
+        }
+
+        function updateInventoryFields(book) {
+            const purchaseQty = Number(book.仕入数) || 0;
+            const salesQty = Number(book.売上数) || 0;
+            const stockQty = Math.max(0, purchaseQty - salesQty);
+            const purchaseUnitCost = Number(book.仕入値) || 0;
+            book.在庫数 = stockQty;
+            book.在庫金額 = stockQty * purchaseUnitCost;
+            return book;
         }
 
         function saveToLocalStorage() {
@@ -1000,20 +1062,14 @@ body {
                 }
 
                 booksData[index].売上数 = newSalesQty;
-
-                let calculatedStock = purchaseQty - newSalesQty;
-                if (calculatedStock < 0) calculatedStock = 0;
-                book.在庫数 = calculatedStock;
-
-                if (calculatedStock === 0) {
+                updateInventoryFields(book);
+                if (book.在庫数 === 0) {
                     book.ステータス = 'SoldOut';
                     if (!book.売上日) {
-                        alert(`【警告】書籍「${book.書名 || '名称未設定'}」の在庫が0になりSoldOutになりましたが、売上日が未記入です。`);
+                        alert(`【警告】書籍「${book.書名 || '名称未設定'}」の在庫が0になりましたが、売上日が未記入です。`);
                     }
-                } else {
-                    if (book.ステータス === 'SoldOut') {
-                        book.ステータス = '販売中';
-                    }
+                } else if (book.ステータス === 'SoldOut') {
+                    book.ステータス = '販売中';
                 }
 
                 const purchaseUnitCost = parseFloat(book.仕入値) || 0;
@@ -1021,12 +1077,11 @@ body {
                 const purchaseTotal = (purchaseUnitCost * purchaseQty) + purchaseShipping;
                 book.仕入合計 = purchaseTotal;
 
-                book.在庫金額 = calculatedStock * purchaseUnitCost;
-
                 const salesPrice = parseFloat(book.販売価格) || 0;
                 const salesShipping = parseFloat(book.販売送料) || 0;
-                const totalSales = salesPrice + salesShipping;
+                const totalSales = newSalesQty * (salesPrice + salesShipping);
                 book.売上合計 = totalSales;
+                book['売上合計（税抜）'] = calculateSalesTotalExcludingTax(book);
 
                 const grossProfit = totalSales - purchaseTotal;
                 book.利益 = grossProfit;
@@ -1039,6 +1094,11 @@ body {
 
         function updateStatusFromTable(index, value) {
             if (booksData[index]) {
+                if (value === '販売中' && Number(booksData[index].在庫数) <= 0) {
+                    alert('在庫数が0のため「販売中」には変更できません。仕入数または売上数を確認してください。');
+                    renderTable();
+                    return;
+                }
                 if (value === 'SoldOut' && (!booksData[index].売上日 || String(booksData[index].売上日).trim() === '')) {
                     alert(`【警告】書籍「${booksData[index].書名 || '名称未設定'}」のステータスが「SoldOut」に変更されましたが、売上日が未記入です。`);
                 }
@@ -1046,6 +1106,17 @@ body {
                 saveToLocalStorage();
                 renderTable();
             }
+        }
+
+        function updateStatusInBookForm(select) {
+            const purchaseQty = Number(document.getElementById('field-仕入数').value) || 0;
+            const salesQty = Number(document.getElementById('field-売上数').value) || 0;
+            const stockQty = Math.max(0, purchaseQty - salesQty);
+            if (select.value === '販売中' && stockQty === 0) {
+                select.value = 'SoldOut';
+                alert('在庫数が0のため「販売中」には変更できません。仕入数または売上数を確認してください。');
+            }
+            checkSoldOutSalesDateWarning();
         }
 
         function renderTable() {
@@ -1069,7 +1140,7 @@ body {
             const filteredBooks = booksData.filter((book) => {
                 const stock = Number(book.在庫数) || 0;
                 const purchaseTotal = Number(book.仕入合計) || 0;
-                const sales = Number(book.売上合計) || 0;
+                const sales = calculateSalesTotal(book);
                 const profit = Number(book.利益) || 0;
 
                 totalStock += stock;
@@ -1187,7 +1258,7 @@ body {
 
                 const price = Number(book.販売価格) || 0;
                 const shipping = Number(book.販売送料) || 0;
-                const totalSalesVal = Number(book.売上合計) || (price + shipping);
+                const totalSalesVal = calculateSalesTotal(book);
 
                 const purchasePrice = Number(book.仕入値) || 0;
                 const purchaseShipping = Number(book.仕入送料) || 0;
@@ -1219,13 +1290,13 @@ body {
                     <td class="py-2 px-4 text-center font-bold">${Number(book.在庫数 || 0).toLocaleString()}</td>
                     
                     <td class="py-2 px-4 text-right font-mono">
-                        <div class="font-bold text-slate-800">¥${purchaseTotal.toLocaleString()}</div>
-                        <div class="text-[10px] text-slate-400">仕入値: ¥${purchasePrice.toLocaleString()} 送料: ¥${purchaseShipping.toLocaleString()}</div>
+                        <div class="font-bold text-slate-800">¥${totalSalesVal.toLocaleString()}</div>
+                        <div class="text-[10px] text-slate-400">販売価格: ¥${price.toLocaleString()} 送料: ¥${shipping.toLocaleString()}</div>
                     </td>
 
                     <td class="py-2 px-4 text-right font-mono">
-                        <div class="font-bold text-slate-800">¥${totalSalesVal.toLocaleString()}</div>
-                        <div class="text-[10px] text-slate-400">販売価格: ¥${price.toLocaleString()} 送料: ¥${shipping.toLocaleString()}</div>
+                        <div class="font-bold text-slate-800">¥${purchaseTotal.toLocaleString()}</div>
+                        <div class="text-[10px] text-slate-400">仕入値: ¥${purchasePrice.toLocaleString()} 送料: ¥${purchaseShipping.toLocaleString()}</div>
                     </td>
 
                     <td class="py-2 px-4 text-right font-mono font-bold ${profit >= 0 ? 'text-emerald-600' : 'text-red-500'}">
@@ -1321,7 +1392,7 @@ body {
                     };
                 }
 
-                const salesVal = Number(book.売上合計) || 0;
+                const salesVal = calculateSalesTotal(book);
                 const costVal = Number(book.仕入合計) || 0;
                 const profitVal = Number(book.利益) || 0;
                 const countVal = Number(book.売上数) || 0;
@@ -1438,6 +1509,32 @@ body {
             recalculateAllCalculatedFields();
         }
 
+        function taxExclusiveAmount(inclusiveAmount, taxRate) {
+            const amount = Number(inclusiveAmount) || 0;
+            const rate = Number(taxRate) || 0;
+            return Math.round(amount / (1 + rate / 100));
+        }
+
+        function calculateSalesTotalExcludingTax(book) {
+            const salesQty = Number(book['売上数']) || 0;
+            const salesPriceNet = book['販売価格（税抜）'] === undefined ||
+                book['販売価格（税抜）'] === null || book['販売価格（税抜）'] === ''
+                ? taxExclusiveAmount(book['販売価格'], book['販売税率'])
+                : Number(book['販売価格（税抜）']) || 0;
+            const salesShippingNet = book['販売送料（税抜）'] === undefined ||
+                book['販売送料（税抜）'] === null || book['販売送料（税抜）'] === ''
+                ? taxExclusiveAmount(book['販売送料'], book['販売送料税率'])
+                : Number(book['販売送料（税抜）']) || 0;
+            return salesQty * (salesPriceNet + salesShippingNet);
+        }
+
+        function calculateSalesTotal(book) {
+            const salesQty = Number(book['売上数']) || 0;
+            const salesPrice = Number(book['販売価格']) || 0;
+            const salesShipping = Number(book['販売送料']) || 0;
+            return salesQty * (salesPrice + salesShipping);
+        }
+
         function recalculateAllCalculatedFields() {
             const purchaseUnitCost = parseFloat(document.getElementById('field-仕入値').value) || 0; 
             const purchaseShipping = parseFloat(document.getElementById('field-仕入送料').value) || 0;
@@ -1452,11 +1549,10 @@ body {
 
             document.getElementById('field-売上数').max = purchaseQty;
             
-            let calculatedStock = purchaseQty - salesQty;
-            if (calculatedStock < 0) calculatedStock = 0;
-            document.getElementById('field-在庫数').value = calculatedStock;
+            const stockQty = Math.max(0, purchaseQty - salesQty);
+            document.getElementById('field-在庫数').value = stockQty;
 
-            if (calculatedStock === 0) {
+            if (stockQty === 0) {
                 document.getElementById('field-ステータス').value = 'SoldOut';
             } else {
                 if (document.getElementById('field-ステータス').value === 'SoldOut') {
@@ -1472,7 +1568,6 @@ body {
 
             const salesPrice = parseFloat(document.getElementById('field-販売価格').value) || 0;
             const salesShipping = parseFloat(document.getElementById('field-販売送料').value) || 0;
-            const stockQty = calculatedStock;
 
             document.getElementById('field-仕入値（税抜）').value = Math.round(purchaseUnitCost / purchaseTaxMultiplier);
             document.getElementById('field-仕入送料（税抜）').value = Math.round(purchaseShipping / shippingTaxMultiplier);
@@ -1486,8 +1581,18 @@ body {
 
             document.getElementById('field-在庫金額').value = stockQty * purchaseUnitCost;
 
-            const totalSales = salesPrice + salesShipping;
+            const totalSales = salesQty * (salesPrice + salesShipping);
             document.getElementById('field-売上合計').value = totalSales;
+            const totalSalesExcludingTax = calculateSalesTotalExcludingTax({
+                '売上数': salesQty,
+                '販売価格（税抜）': document.getElementById('field-販売価格（税抜）').value,
+                '販売税率': document.getElementById('field-販売税率').value,
+                '販売送料（税抜）': document.getElementById('field-販売送料（税抜）').value,
+                '販売送料税率': document.getElementById('field-販売送料税率').value,
+                '販売価格': salesPrice,
+                '販売送料': salesShipping
+            });
+            document.getElementById('field-売上合計（税抜）').value = totalSalesExcludingTax;
 
             updateSettlementFee();
 
@@ -1650,6 +1755,9 @@ body {
         function openBookModal(index = null) {
             const form = document.getElementById('book-form');
             form.reset();
+            updateEvidencePdfLink('', '');
+            updateEvidenceTypeUI();
+            updateEvidenceTypeAppearance(document.getElementById('evidence-type'));
 
             if (index !== null && booksData[index]) {
                 document.getElementById('modal-title').innerText = '書籍情報の編集';
@@ -1669,7 +1777,9 @@ body {
                         input.value = val;
                     }
                 });
-
+                const evidence = parseEvidenceValue(book['証憑']);
+                document.getElementById('field-証憑').value = evidence.reference;
+                updateEvidencePdfLink(evidence.fileId, '');
                 calculateTaxFromListPrice();
                 calculateSalesPriceTax();
                 calculateSalesShippingTax();
@@ -1682,9 +1792,6 @@ body {
                 const nextId = generateNextID();
                 
                 document.getElementById('field-ID').value = nextId;
-                document.getElementById('field-登録日').value = dateStr;
-                document.getElementById('field-仕入日').value = dateStr;
-                document.getElementById('field-売上日').value = dateStr;
                 document.getElementById('field-記入日').value = dateStr;
                 document.getElementById('field-ステータス').value = '保留';
                 document.getElementById('field-仕入時の状態').value = '新本';
@@ -1704,8 +1811,130 @@ body {
                 recalculateAllCalculatedFields();
             }
 
+            document.querySelectorAll('#book-form input[type="date"]').forEach(updateDateFieldAppearance);
+            updateSelectFieldAppearance(document.getElementById('field-販売場所'));
+            updateSelectFieldAppearance(document.getElementById('field-発送手段'));
+            updateSelectFieldAppearance(document.getElementById('field-決済手数料名'));
+            updateEvidenceTypeAppearance(document.getElementById('evidence-type'));
             checkSoldOutSalesDateWarning();
             document.getElementById('book-modal').classList.remove('hidden');
+        }
+
+        function parseEvidenceValue(value) {
+            const text = String(value || '');
+            const match = text.match(/^\[DRIVE_FILE:([A-Za-z0-9_-]+)\](?:\r?\n([\s\S]*))?$/);
+            return match
+                ? { fileId: match[1], reference: match[2] || '' }
+                : { fileId: '', reference: text };
+        }
+
+        function updateEvidencePdfLink(fileId, statusMessage) {
+            const fileIdInput = document.getElementById('field-証憑ファイルID');
+            const link = document.getElementById('evidence-pdf-link');
+            const status = document.getElementById('evidence-upload-status');
+            fileIdInput.value = fileId || '';
+            if (fileId) {
+                link.href = `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/view`;
+                link.classList.remove('hidden');
+                link.setAttribute('aria-label', '保存したPDF証憑を開く');
+            } else {
+                link.removeAttribute('href');
+                link.classList.add('hidden');
+            }
+            status.textContent = statusMessage || (fileId ? 'PDF証憑を添付済みです。' : '');
+            status.classList.toggle('hidden', !status.textContent);
+            status.classList.toggle('text-red-600', Boolean(statusMessage && statusMessage.startsWith('エラー:')));
+            status.classList.toggle('text-slate-500', !(statusMessage && statusMessage.startsWith('エラー:')));
+        }
+
+        async function uploadEvidencePdf(fileInput) {
+            const file = fileInput.files && fileInput.files[0];
+            fileInput.value = '';
+            if (!file) return;
+
+            const bookId = document.getElementById('field-ID').value.trim();
+            if (!bookId) {
+                alert('先に書籍情報を入力してください。');
+                return;
+            }
+            const purchaseDate = document.getElementById('field-仕入日').value.replace(/-/g, '');
+            const supplier = document.getElementById('field-仕入先').value.trim();
+            if (!/^\d{8}$/.test(purchaseDate)) {
+                alert('PDFのファイル名に使う仕入日を入力してください。');
+                return;
+            }
+            if (!supplier) {
+                alert('PDFのファイル名に使う仕入先を入力してください。');
+                return;
+            }
+            recalculateAllCalculatedFields();
+            const purchaseTotal = Number(document.getElementById('field-仕入合計').value);
+            if (!Number.isFinite(purchaseTotal) || purchaseTotal < 0) {
+                alert('仕入合計が正しくありません。');
+                return;
+            }
+            const selectedType = document.getElementById('evidence-type').value;
+            const evidenceType = selectedType === 'その他'
+                ? document.getElementById('evidence-type-other').value.trim()
+                : selectedType;
+            if (!evidenceType) {
+                alert('証憑の種類を入力してください。');
+                document.getElementById('evidence-type-other').focus();
+                return;
+            }
+            if (!/\.pdf$/i.test(file.name) || (file.type && file.type !== 'application/pdf')) {
+                alert('PDFファイルを選択してください。');
+                return;
+            }
+            if (file.size > 10 * 1024 * 1024) {
+                alert('PDFは10MB以下のファイルを選択してください。');
+                return;
+            }
+
+            const uploadButton = fileInput.parentElement.querySelector('button');
+            uploadButton.disabled = true;
+            updateEvidencePdfLink(
+                document.getElementById('field-証憑ファイルID').value,
+                'PDFをGoogle Driveに保存中…'
+            );
+
+            try {
+                const dataUrl = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(String(reader.result || ''));
+                    reader.onerror = () => reject(new Error('PDFファイルを読み取れませんでした。'));
+                    reader.readAsDataURL(file);
+                });
+                const base64 = dataUrl.split(',')[1];
+                if (!base64) throw new Error('PDFファイルを読み取れませんでした。');
+
+                const result = await postAppsScriptRequest({
+                    action: 'uploadEvidence',
+                    bookId,
+                    fileName: file.name,
+                    purchaseDate,
+                    purchaseTotal: Math.round(purchaseTotal),
+                    supplier,
+                    evidenceType,
+                    base64
+                });
+                if (!result.evidence || !result.evidence.fileId) {
+                    throw new Error('保存結果にDriveファイルIDがありません。Code.gsのデプロイ内容を確認してください。');
+                }
+                if (document.getElementById('field-ID').value.trim() !== bookId) {
+                    throw new Error('PDFはDriveに保存されましたが、フォームの書籍が切り替わったため添付できませんでした。対象の書籍を開き直してPDFを選択してください。');
+                }
+                updateEvidencePdfLink(result.evidence.fileId, `Drive保存済み。書籍情報を保存すると添付されます: ${result.evidence.fileName}`);
+            } catch (error) {
+                console.error('証憑PDFの保存エラー:', error);
+                updateEvidencePdfLink(
+                    document.getElementById('field-証憑ファイルID').value,
+                    `エラー: ${error.message || 'PDFを保存できませんでした。'}`
+                );
+                alert(error.message || 'PDFをGoogle Driveに保存できませんでした。');
+            } finally {
+                uploadButton.disabled = false;
+            }
         }
 
         function closeBookModal() {
@@ -1714,7 +1943,7 @@ body {
 
         function saveBook(e) {
             e.preventDefault();
-            
+
             const purchaseQty = parseFloat(document.getElementById('field-仕入数').value) || 0;
             const salesQty = parseFloat(document.getElementById('field-売上数').value) || 0;
             if (salesQty > purchaseQty) {
@@ -1724,12 +1953,17 @@ body {
 
             const statusVal = document.getElementById('field-ステータス').value;
             const saleDateVal = document.getElementById('field-売上日').value;
+            if (statusVal === '販売中' && purchaseQty - salesQty <= 0) {
+                alert('在庫数が0のため「販売中」には変更できません。仕入数または売上数を確認してください。');
+                return;
+            }
             if (statusVal === 'SoldOut' && !saleDateVal) {
                 alert('【警告】ステータスが「SoldOut」に設定されていますが、売上日が未記入です。');
             }
 
             const editingIdx = document.getElementById('field-editing-index').value;
 
+            recalculateAllCalculatedFields();
             const newBook = {};
             EXACT_41_FIELDS.forEach(field => {
                 const input = document.getElementById(`field-${field}`);
@@ -1743,6 +1977,11 @@ body {
                     newBook[field] = val;
                 }
             });
+            const evidenceFileId = document.getElementById('field-証憑ファイルID').value;
+            if (evidenceFileId) {
+                const evidenceReference = document.getElementById('field-証憑').value.trim();
+                newBook['証憑'] = `[DRIVE_FILE:${evidenceFileId}]${evidenceReference ? `\n${evidenceReference}` : ''}`;
+            }
 
             if (editingIdx !== '') {
                 booksData[editingIdx] = newBook;
@@ -1893,9 +2132,16 @@ body {
                     if (!book['販売税率']) book['販売税率'] = 10;
                     if (!book['販売送料税率']) book['販売送料税率'] = 10;
 
+                    if (book['販売価格（税抜）'] === undefined || book['販売価格（税抜）'] === '') {
+                        book['販売価格（税抜）'] = taxExclusiveAmount(book['販売価格'], book['販売税率']);
+                    }
+                    if (book['販売送料（税抜）'] === undefined || book['販売送料（税抜）'] === '') {
+                        book['販売送料（税抜）'] = taxExclusiveAmount(book['販売送料'], book['販売送料税率']);
+                    }
                     const price = parseFloat(book['販売価格']) || 0;
                     const shipping = parseFloat(book['販売送料']) || 0;
-                    const totalSales = price + shipping;
+                    const salesQty = parseFloat(book['売上数']) || 0;
+                    const totalSales = salesQty * (price + shipping);
 
                     let purchaseTotal = parseFloat(book['仕入合計']);
                     if (isNaN(purchaseTotal)) {
@@ -1907,8 +2153,10 @@ body {
                     }
 
                     book['売上合計'] = totalSales;
+                    book['売上合計（税抜）'] = calculateSalesTotalExcludingTax(book);
                     book['利益'] = totalSales - purchaseTotal;
                     book['利益率'] = totalSales > 0 ? (((totalSales - purchaseTotal) / totalSales) * 100).toFixed(1) : 0;
+                    updateInventoryFields(book);
 
                     if (book.ID || book.書名) {
                         importedBooks.push(book);
@@ -2043,6 +2291,9 @@ body {
             EXACT_41_FIELDS.forEach(field => {
                 record[field] = book[field] === undefined || book[field] === null ? '' : book[field];
             });
+            updateInventoryFields(record);
+            record['売上合計'] = calculateSalesTotal(record);
+            record['売上合計（税抜）'] = calculateSalesTotalExcludingTax(record);
             return record;
         }
 
@@ -2050,9 +2301,9 @@ body {
             return EXACT_41_FIELDS.every(field => String(left[field] ?? '') === String(right[field] ?? ''));
         }
 
-        function postBookSyncRequest(payload) {
+        function postAppsScriptRequest(payload) {
             return new Promise((resolve, reject) => {
-                const requestId = `sync-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+                const requestId = `app-${Date.now()}-${Math.random().toString(36).slice(2)}`;
                 let activeScript = null;
                 let activeCallbackName = null;
                 let pollTimer = null;
@@ -2066,7 +2317,7 @@ body {
                 };
 
                 const timeoutId = setTimeout(() => {
-                    finishWithError(new Error('Apps Scriptから同期結果が届きません。Code.gsの最新版をウェブアプリとして再デプロイし、アクセス権限を確認してください。'));
+                    finishWithError(new Error('Apps Scriptから処理結果が届きません。Code.gsの最新版をウェブアプリとして再デプロイし、アクセス権限を確認してください。'));
                 }, 60000);
 
                 const finishWithError = error => {
@@ -2081,7 +2332,7 @@ body {
                     activeCallbackName = `bookSyncResult_${Date.now()}_${Math.random().toString(36).slice(2)}`;
                     activeScript = document.createElement('script');
                     activeScript.onerror = () => {
-                        finishWithError(new Error('Apps Scriptの同期結果を読み取れません。ウェブアプリURLとアクセス権限を確認してください。'));
+                        finishWithError(new Error('Apps Scriptの処理結果を読み取れません。ウェブアプリURLとアクセス権限を確認してください。'));
                     };
 
                     window[activeCallbackName] = result => {
@@ -2091,14 +2342,14 @@ body {
                         activeCallbackName = null;
 
                         if (result && result.protocol === 1) {
-                            finishWithError(new Error('Apps ScriptのCode.gsが古いバージョンです。同期対応版を反映し、新しいバージョンで再デプロイしてください。'));
+                            finishWithError(new Error('Apps ScriptのCode.gsが古いバージョンです。最新版を反映し、新しいバージョンで再デプロイしてください。'));
                             return;
                         }
                         if (result && result.pending) {
                             pollTimer = setTimeout(pollForResult, 1000);
                             return;
                         }
-                        if (result && result.ok && Array.isArray(result.books)) {
+                        if (result && result.ok) {
                             settled = true;
                             cleanup();
                             resolve(result);
@@ -2144,10 +2395,13 @@ body {
                 }
 
                 const submittedBooks = booksData.map(getBookSyncRecord);
-                const result = await postBookSyncRequest({
+                const result = await postAppsScriptRequest({
                     books: submittedBooks,
                     baseline: baseline.map(getBookSyncRecord)
                 });
+                if (!Array.isArray(result.books)) {
+                    throw new Error('Apps Scriptから不正な同期応答が返されました。Code.gsのデプロイ内容を確認してください。');
+                }
 
                 const serverBooks = result.books.map(getBookSyncRecord);
                 const mergedBooks = new Map(serverBooks.map(book => [String(book.ID), book]));
