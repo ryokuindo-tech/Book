@@ -210,7 +210,7 @@ body {
                         <i class="fa-solid fa-arrows-rotate"></i>
                         <span>今すぐ同期</span>
                     </button>
-                    <a href="./Report.html" onclick="return openProfitLossReport(event)" class="bg-slate-800 hover:bg-slate-700 text-white px-3.5 py-2 rounded-xl text-sm font-medium flex items-center space-x-2 transition shadow">
+                    <a href="Report.html" onclick="return openProfitLossReport(event)" class="bg-slate-800 hover:bg-slate-700 text-white px-3.5 py-2 rounded-xl text-sm font-medium flex items-center space-x-2 transition shadow">
                         <i class="fa-solid fa-chart-line"></i>
                         <span class="hidden sm:inline">損益計算書</span>
                     </a>
@@ -1709,7 +1709,7 @@ body {
             let bookData = null;
 
             try {
-                const res = await fetch('https://api.openbd.jp/v1/get?isbn=' + encodeURIComponent(cleanIsbn));
+                const res = await fetch(`https://api.openbd.jp/v1/get?isbn=${cleanIsbn}`);
                 const data = await res.json();
                 if (data && data[0] && data[0].summary) {
                     const summary = data[0].summary;
@@ -1738,7 +1738,7 @@ body {
 
             if (!bookData) {
                 try {
-                    const res = await fetch('https://ndlsearch.ndl.go.jp/api/opensearch?isbn=' + encodeURIComponent(cleanIsbn));
+                    const res = await fetch(`https://ndlsearch.ndl.go.jp/api/opensearch?isbn=${cleanIsbn}`);
                     const text = await res.text();
                     const parser = new DOMParser();
                     const xml = parser.parseFromString(text, "application/xml");
@@ -1762,7 +1762,7 @@ body {
 
             if (!bookData) {
                 try {
-                    const res = await fetch('https://www.googleapis.com/books/v1/volumes?q=isbn:' + encodeURIComponent(cleanIsbn));
+                    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanIsbn}`);
                     const data = await res.json();
                     if (data && data.items && data.items.length > 0) {
                         const volumeInfo = data.items[0].volumeInfo;
@@ -2827,6 +2827,8 @@ body {
             }
         }
 
+        const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwMe7Ww20mO4gnNeB5bLU-gAeL1coPTN0I6jnHCmlMkqfcMfELKv7Okpd5iHDZjOgHE2w/exec";
+
         function scheduleGoogleSheetsSync() {
             clearTimeout(syncDebounceTimer);
             syncDebounceTimer = setTimeout(() => syncWithGoogleSheets(), 800);
@@ -2840,6 +2842,17 @@ body {
             status.className = `text-xs ${colorClass}`;
         }
 
+        function openProfitLossReport(event) {
+            if (window.location.protocol === 'file:') return true;
+            event.preventDefault();
+            const appUrl = document.body.dataset.appUrl;
+            const baseUrl = appUrl && appUrl.startsWith('https://script.google.com/')
+                ? appUrl
+                : GAS_WEB_APP_URL;
+            window.location.href = `${baseUrl}?action=report`;
+            return false;
+        }
+
         function getBookSyncRecord(book) {
             const record = {};
             EXACT_41_FIELDS.forEach(field => {
@@ -2851,39 +2864,83 @@ body {
             return record;
         }
 
-        function openProfitLossReport(event) {
-            const appUrl = document.body.dataset.appUrl;
-            if (appUrl && appUrl.startsWith('https://script.google.com/')) {
-                event.preventDefault();
-                window.location.href = `${appUrl}?action=report`;
-            }
-            return true;
-        }
-
         function sameBookForSync(left, right) {
             return EXACT_41_FIELDS.every(field => String(left[field] ?? '') === String(right[field] ?? ''));
         }
 
         function postAppsScriptRequest(payload) {
             return new Promise((resolve, reject) => {
-                if (!window.google?.script?.run) {
-                    reject(new Error('スプレッドシート同期とPDF保存はApps Scriptのウェブアプリから利用してください。'));
-                    return;
-                }
-                const runner = google.script.run
-                    .withSuccessHandler(result => {
-                        if (payload.action === 'uploadEvidence') {
-                            resolve({ evidence: result });
+                const requestId = `app-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+                let activeScript = null;
+                let activeCallbackName = null;
+                let pollTimer = null;
+                let settled = false;
+
+                const cleanup = () => {
+                    clearTimeout(timeoutId);
+                    clearTimeout(pollTimer);
+                    if (activeCallbackName) delete window[activeCallbackName];
+                    if (activeScript) activeScript.remove();
+                };
+
+                const timeoutId = setTimeout(() => {
+                    finishWithError(new Error('Apps Scriptから処理結果が届きません。Code.gsの最新版をウェブアプリとして再デプロイし、アクセス権限を確認してください。'));
+                }, 60000);
+
+                const finishWithError = error => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    reject(error);
+                };
+
+                const pollForResult = () => {
+                    if (settled) return;
+                    activeCallbackName = `bookSyncResult_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+                    activeScript = document.createElement('script');
+                    activeScript.onerror = () => {
+                        finishWithError(new Error('Apps Scriptの処理結果を読み取れません。ウェブアプリURLとアクセス権限を確認してください。'));
+                    };
+
+                    window[activeCallbackName] = result => {
+                        if (activeScript) activeScript.remove();
+                        activeScript = null;
+                        delete window[activeCallbackName];
+                        activeCallbackName = null;
+
+                        if (result && result.protocol === 1) {
+                            finishWithError(new Error('Apps ScriptのCode.gsが古いバージョンです。最新版を反映し、新しいバージョンで再デプロイしてください。'));
                             return;
                         }
-                        resolve({ books: result });
-                    })
-                    .withFailureHandler(error => reject(new Error(error.message || 'Apps Scriptの処理に失敗しました。')));
-                if (payload.action === 'uploadEvidence') {
-                    runner.uploadEvidencePdf(payload);
-                } else {
-                    runner.synchronizeBooksFromClient(payload);
-                }
+                        if (result && result.pending) {
+                            pollTimer = setTimeout(pollForResult, 1000);
+                            return;
+                        }
+                        if (result && result.ok) {
+                            settled = true;
+                            cleanup();
+                            resolve(result);
+                            return;
+                        }
+                        finishWithError(new Error(
+                            result && result.error
+                                ? result.error
+                                : 'Apps Scriptから不正な同期応答が返されました。Code.gsのデプロイ内容を確認してください。'
+                        ));
+                    };
+
+                    activeScript.src = `${GAS_WEB_APP_URL}?requestId=${encodeURIComponent(requestId)}&callback=${encodeURIComponent(activeCallbackName)}&t=${Date.now()}`;
+                    document.head.appendChild(activeScript);
+                };
+
+                const body = new URLSearchParams({
+                    payload: JSON.stringify({ ...payload, requestId })
+                });
+                fetch(GAS_WEB_APP_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body
+                }).then(pollForResult).catch(finishWithError);
             });
         }
 
