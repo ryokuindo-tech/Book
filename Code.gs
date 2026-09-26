@@ -11,64 +11,17 @@ const BOOK_FIELDS = [
 ];
 
 function doGet(event) {
-  if (event.parameter.action === 'app') {
-    const template = HtmlService.createTemplateFromFile('Index');
-    template.WEB_APP_URL = ScriptApp.getService().getUrl();
-    return template.evaluate()
-      .setTitle('書籍管理システム');
-  }
-  if (event.parameter.action === 'report') {
-    const template = HtmlService.createTemplateFromFile('Report');
-    template.WEB_APP_URL = ScriptApp.getService().getUrl();
-    return template.evaluate()
-      .setTitle('損益計算書 | 書籍管理システム');
-  }
-
-  const callback = String(event.parameter.callback || '');
-  if (!/^[A-Za-z_$][0-9A-Za-z_$]*$/.test(callback)) {
-    return ContentService.createTextOutput('Invalid callback');
-  }
-
-  const requestId = String(event.parameter.requestId || '').trim();
-  if (requestId) {
-    const cachedResult = CacheService.getScriptCache().get(syncCacheKey_(requestId));
-    return jsonpResponse_(callback, cachedResult
-      ? JSON.parse(cachedResult)
-      : { protocol: 2, pending: true });
-  }
-
-  return jsonpResponse_(callback, { protocol: 2, mode: 'google.script.run' });
+  const action = String(event.parameter.action || 'app');
+  const isReport = action === 'report';
+  const template = HtmlService.createTemplateFromFile(isReport ? 'Report' : 'Index');
+  template.WEB_APP_URL = ScriptApp.getService().getUrl();
+  return template.evaluate()
+    .setTitle(isReport ? '損益計算書 | 書籍管理システム' : '書籍管理システム')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
-function doPost(event) {
-  let requestId = String(event.parameter.requestId || '').trim();
-  try {
-    const request = JSON.parse(event.parameter.payload || '{}');
-    requestId = requestId || String(request.requestId || '').trim();
-    if (request.action === 'uploadEvidence') {
-      const evidence = uploadEvidencePdf_(request);
-      if (requestId) {
-        putSyncResult_(requestId, { protocol: 2, ok: true, evidence: evidence });
-      }
-      return ContentService.createTextOutput('');
-    }
-
-    const books = synchronizeBooksFromClient(request);
-    if (requestId) {
-      putSyncResult_(requestId, { protocol: 2, ok: true, books: books });
-    }
-    return ContentService.createTextOutput('');
-  } catch (error) {
-    console.error(error);
-    if (requestId) {
-      putSyncResult_(requestId, {
-        protocol: 2,
-        ok: false,
-        error: error.message || String(error)
-      });
-    }
-    return ContentService.createTextOutput('');
-  }
+function uploadEvidencePdf(request) {
+  return uploadEvidencePdf_(request);
 }
 
 function uploadEvidencePdf_(request) {
@@ -143,14 +96,6 @@ function authorizeEvidenceDriveAccess() {
 function getOrCreateFolder_(parent, name) {
   const folders = parent.getFoldersByName(name);
   return folders.hasNext() ? folders.next() : parent.createFolder(name);
-}
-
-function syncCacheKey_(requestId) {
-  return `book-sync-result:${requestId}`;
-}
-
-function putSyncResult_(requestId, result) {
-  CacheService.getScriptCache().put(syncCacheKey_(requestId), JSON.stringify(result), 21600);
 }
 
 function synchronizeBooksFromClient(request) {
@@ -367,13 +312,4 @@ function writeSheetBooks_(sheet, books) {
       sheet.appendRow(values);
     }
   });
-}
-
-function jsonpResponse_(callback, message) {
-  const encoded = JSON.stringify(message)
-    .replace(/</g, '\\u003c')
-    .replace(/\u2028/g, '\\u2028')
-    .replace(/\u2029/g, '\\u2029');
-  return ContentService.createTextOutput(`${callback}(${encoded});`)
-    .setMimeType(ContentService.MimeType.JAVASCRIPT);
 }
