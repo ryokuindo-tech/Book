@@ -17,7 +17,7 @@
                     <p class="text-xs text-slate-400">書籍管理システム・税込ベース</p>
                 </div>
             </div>
-            <a href="./index.html" class="flex items-center gap-2 rounded-xl bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white shadow transition hover:bg-indigo-500">
+            <a id="back-to-app" href="index.html" class="flex items-center gap-2 rounded-xl bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white shadow transition hover:bg-indigo-500">
                 <i class="fa-solid fa-arrow-left"></i>
                 <span class="hidden sm:inline">書籍一覧へ戻る</span>
             </a>
@@ -276,6 +276,13 @@
             document.getElementById('report-status').textContent = `${books.length.toLocaleString('ja-JP')}件の書籍データから集計しました。`;
         }
 
+        (function configureBackLink() {
+            const link = document.getElementById('back-to-app');
+            const appUrl = document.body.dataset.appUrl;
+            if (appUrl && appUrl.startsWith('https://script.google.com/')) {
+                link.href = `${appUrl}?action=app`;
+            }
+        })();
         renderProfitLoss();
     </script>
 </body>
