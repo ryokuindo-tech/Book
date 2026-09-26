@@ -5,7 +5,7 @@ const BOOK_FIELDS = [
   '仕入数', '仕入値', '仕入値（税抜）', '掛率', '仕入送料', '仕入送料（税抜）',
   '仕入合計', '売上数', '在庫数', '在庫金額', '販売場所', '登録日',
   '販売価格', '販売価格（税抜）', '販売税率', '販売送料', '販売送料（税抜）',
-  '販売送料税率', '売上合計', '発送手段', '発送費用', '決済手数料名',
+  '販売送料税率', '売上合計', '売上合計（税抜）', '発送手段', '発送費用', '決済手数料名',
   '決済手数料', '利益', '利益率', '売上日', '入金日', 'ステータス',
   '備考', '証憑', '記入日'
 ];
@@ -37,6 +37,14 @@ function doPost(event) {
   try {
     const request = JSON.parse(event.parameter.payload || '{}');
     requestId = requestId || String(request.requestId || '').trim();
+    if (request.action === 'uploadEvidence') {
+      const evidence = uploadEvidencePdf_(request);
+      if (requestId) {
+        putSyncResult_(requestId, { protocol: 2, ok: true, evidence: evidence });
+      }
+      return ContentService.createTextOutput('');
+    }
+
     const books = synchronizeBooksFromClient(request);
     if (requestId) {
       putSyncResult_(requestId, { protocol: 2, ok: true, books: books });
@@ -53,6 +61,80 @@ function doPost(event) {
     }
     return ContentService.createTextOutput('');
   }
+}
+
+function uploadEvidencePdf_(request) {
+  const bookId = String(request.bookId || '').trim();
+  const fileName = String(request.fileName || '');
+  const base64 = String(request.base64 || '');
+  const purchaseDate = String(request.purchaseDate || '');
+  const supplier = sanitizeEvidenceFileNamePart_(request.supplier);
+  const evidenceType = sanitizeEvidenceFileNamePart_(request.evidenceType);
+  const purchaseTotal = Number(request.purchaseTotal);
+  if (!bookId) throw new Error('書籍IDがないため、証憑を保存できません。');
+  if (!/\.pdf$/i.test(fileName)) throw new Error('PDFファイルを選択してください。');
+  if (!base64) throw new Error('PDFファイルの内容を読み取れませんでした。');
+  if (!/^\d{8}$/.test(purchaseDate)) throw new Error('仕入日をYYYYMMDD形式で入力してください。');
+  const purchaseYear = Number(purchaseDate.slice(0, 4));
+  const purchaseMonth = Number(purchaseDate.slice(4, 6));
+  const day = Number(purchaseDate.slice(6, 8));
+  const parsedPurchaseDate = new Date(purchaseYear, purchaseMonth - 1, day);
+  if (
+    parsedPurchaseDate.getFullYear() !== purchaseYear ||
+    parsedPurchaseDate.getMonth() !== purchaseMonth - 1 ||
+    parsedPurchaseDate.getDate() !== day
+  ) throw new Error('仕入日が正しくありません。');
+  if (!supplier) throw new Error('仕入先を入力してください。');
+  if (!evidenceType) throw new Error('証憑の種類を入力してください。');
+  if (!Number.isFinite(purchaseTotal) || purchaseTotal < 0) throw new Error('仕入合計が正しくありません。');
+
+  const bytes = Utilities.base64Decode(base64);
+  if (bytes.length > 10 * 1024 * 1024) {
+    throw new Error('PDFは10MB以下のファイルを選択してください。');
+  }
+  const signature = Utilities.newBlob(bytes).getDataAsString().slice(0, 5);
+  if (signature !== '%PDF-') throw new Error('選択したファイルは有効なPDFではありません。');
+
+  const timeZone = Session.getScriptTimeZone();
+  const now = new Date();
+  const year = Utilities.formatDate(now, timeZone, 'yyyy');
+  const month = Utilities.formatDate(now, timeZone, 'MM');
+  const root = DriveApp.getRootFolder();
+  const evidenceFolder = getOrCreateFolder_(root, '証憑');
+  const yearFolder = getOrCreateFolder_(evidenceFolder, Utilities.formatDate(now, timeZone, 'yyyy'));
+  const monthFolder = getOrCreateFolder_(yearFolder, month);
+  const safeAmount = String(Math.round(purchaseTotal));
+  const pdf = Utilities.newBlob(
+    bytes,
+    'application/pdf',
+    `${purchaseDate}_${safeAmount}_${supplier}_${evidenceType}.pdf`
+  );
+  const file = monthFolder.createFile(pdf);
+
+  return {
+    fileId: file.getId(),
+    fileName: file.getName()
+  };
+}
+
+function sanitizeEvidenceFileNamePart_(value) {
+  return String(value || '')
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-')
+    .replace(/[\s_]+/g, '-')
+    .replace(/^[.-]+|[.-]+$/g, '')
+    .slice(0, 60);
+}
+
+function authorizeEvidenceDriveAccess() {
+  const authorizationFolder = DriveApp.createFolder(
+    `.book-drive-authorization-${Utilities.getUuid()}`
+  );
+  authorizationFolder.setTrashed(true);
+}
+
+function getOrCreateFolder_(parent, name) {
+  const folders = parent.getFoldersByName(name);
+  return folders.hasNext() ? folders.next() : parent.createFolder(name);
 }
 
 function syncCacheKey_(requestId) {
@@ -84,6 +166,7 @@ function synchronizeBooks_(request) {
   const remoteBooks = readSheetBooks_(sheet);
   const mergedBooks = mergeBooks_(localBooks, remoteBooks, baselineBooks);
 
+  mergedBooks.forEach(normalizeInventoryFields_);
   writeSheetBooks_(sheet, mergedBooks);
   return Array.from(mergedBooks.values());
 }
@@ -97,9 +180,9 @@ function getBookSheet_() {
   let sheet = spreadsheet.getSheetByName(BOOK_SHEET_NAME);
   if (!sheet) {
     sheet = spreadsheet.getSheets().find(candidate => {
-      if (candidate.getLastRow() === 0 || candidate.getLastColumn() < BOOK_FIELDS.length) return false;
-      const headers = candidate.getRange(1, 1, 1, BOOK_FIELDS.length).getDisplayValues()[0];
-      return BOOK_FIELDS.every((field, index) => headers[index] === field);
+      if (candidate.getLastRow() === 0) return false;
+      return sheetHasHeaders_(candidate, BOOK_FIELDS) ||
+        sheetHasHeaders_(candidate, BOOK_FIELDS.filter(field => field !== '売上合計（税抜）'));
     });
   }
   if (!sheet) sheet = spreadsheet.insertSheet(BOOK_SHEET_NAME);
@@ -109,13 +192,29 @@ function getBookSheet_() {
     sheet.setFrozenRows(1);
     sheet.getRange(1, 1, 1, BOOK_FIELDS.length).setFontWeight('bold');
   } else {
-    const headers = sheet.getRange(1, 1, 1, BOOK_FIELDS.length).getDisplayValues()[0];
+    let headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+    const legacyFields = BOOK_FIELDS.filter(field => field !== '売上合計（税抜）');
+    if (
+      headers.length === legacyFields.length &&
+      legacyFields.every((field, index) => headers[index] === field)
+    ) {
+      const salesTotalColumn = BOOK_FIELDS.indexOf('売上合計') + 1;
+      sheet.insertColumnAfter(salesTotalColumn);
+      sheet.getRange(1, salesTotalColumn + 1).setValue('売上合計（税抜）').setFontWeight('bold');
+      headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+    }
     if (BOOK_FIELDS.some((field, index) => headers[index] !== field)) {
       throw new Error(`「${BOOK_SHEET_NAME}」シートの1行目が想定した項目名と一致しません。既存データを保護するため同期を中止しました。`);
     }
   }
 
   return sheet;
+}
+
+function sheetHasHeaders_(sheet, fields) {
+  if (sheet.getLastColumn() < fields.length) return false;
+  const headers = sheet.getRange(1, 1, 1, fields.length).getDisplayValues()[0];
+  return fields.every((field, index) => headers[index] === field);
 }
 
 function readSheetBooks_(sheet) {
@@ -149,6 +248,16 @@ function recordsById_(records, sourceName) {
     BOOK_FIELDS.forEach(field => {
       book[field] = source[field] === undefined || source[field] === null ? '' : source[field];
     });
+    if (book['売上合計（税抜）'] === '') {
+      const salesPriceNet = book['販売価格（税抜）'] === ''
+        ? taxExclusiveAmount_(book['販売価格'], book['販売税率'])
+        : Number(book['販売価格（税抜）']) || 0;
+      const salesShippingNet = book['販売送料（税抜）'] === ''
+        ? taxExclusiveAmount_(book['販売送料'], book['販売送料税率'])
+        : Number(book['販売送料（税抜）']) || 0;
+      book['売上合計（税抜）'] = salesPriceNet + salesShippingNet;
+    }
+    normalizeInventoryFields_(book);
     const id = String(book.ID).trim();
     if (!id) throw new Error(`${sourceName}にIDが未入力の書籍があります。`);
     if (result.has(id)) throw new Error(`${sourceName}にID「${id}」が重複しています。`);
@@ -156,6 +265,21 @@ function recordsById_(records, sourceName) {
     result.set(id, book);
   });
   return result;
+}
+
+function normalizeInventoryFields_(book) {
+  const purchaseQty = Number(book['仕入数']) || 0;
+  const salesQty = Number(book['売上数']) || 0;
+  const stockQty = Math.max(0, purchaseQty - salesQty);
+  const purchaseUnitCost = Number(book['仕入値']) || 0;
+  book['在庫数'] = stockQty;
+  book['在庫金額'] = stockQty * purchaseUnitCost;
+}
+
+function taxExclusiveAmount_(inclusiveAmount, taxRate) {
+  const amount = Number(inclusiveAmount) || 0;
+  const rate = Number(taxRate) || 0;
+  return Math.round(amount / (1 + rate / 100));
 }
 
 function mergeBooks_(localBooks, remoteBooks, baselineBooks) {
@@ -186,14 +310,24 @@ function mergeBooks_(localBooks, remoteBooks, baselineBooks) {
       return;
     }
 
-    result.set(id, sameBook_(remote, baseline) ? local : remote);
+    const mergedBook = { ...local };
+    BOOK_FIELDS.forEach(field => {
+      if (!sameValue_(remote[field], baseline[field])) {
+        mergedBook[field] = remote[field];
+      }
+    });
+    result.set(id, mergedBook);
   });
 
   return result;
 }
 
+function sameValue_(left, right) {
+  return String(left ?? '') === String(right ?? '');
+}
+
 function sameBook_(left, right) {
-  return BOOK_FIELDS.every(field => String(left[field] ?? '') === String(right[field] ?? ''));
+  return BOOK_FIELDS.every(field => sameValue_(left[field], right[field]));
 }
 
 function writeSheetBooks_(sheet, books) {
