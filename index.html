@@ -78,7 +78,7 @@ body {
                     <i class="fa-solid fa-book-bookmark text-xl"></i>
                 </div>
                 <div>
-                    <h1 class="font-bold text-lg leading-tight">書籍</h1>
+                    <h1 class="font-bold text-lg leading-tight">書籍・在庫管理 Webシステム</h1>
                     <p class="text-xs text-slate-400">Excel連動・粗利自動算定・月別集計対応</p>
                 </div>
             </div>
@@ -155,20 +155,9 @@ body {
         <!-- Search & Filter Area -->
         <section class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div class="flex-1 min-w-0">
-                    <label for="search-input" class="block mb-1.5 text-sm font-semibold text-slate-700">書籍を検索</label>
-                    <div class="relative">
-                        <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true"></i>
-                        <input type="text" id="search-input" oninput="renderTable()" placeholder="書名・著者・ISBNなど" aria-describedby="search-help search-result-count" class="w-full pl-11 pr-20 py-3 border border-slate-300 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
-                        <button type="button" id="search-clear" onclick="clearSearch()" aria-label="検索語をクリア" class="hidden absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
-                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-                        </button>
-                        <kbd class="absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-xs text-slate-400 pointer-events-none" id="search-shortcut">/</kbd>
-                    </div>
-                    <div class="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-slate-500">
-                        <span id="search-help">ID・書名・著者・出版社・ISBN・ISC・販売場所で検索できます</span>
-                        <span id="search-result-count" role="status" aria-live="polite" class="font-medium text-slate-600"></span>
-                    </div>
+                <div class="relative flex-1">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input type="text" id="search-input" oninput="renderTable()" placeholder="ID・書名・著者・出版社・ISBN・ISC・販売場所で検索..." class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
@@ -858,21 +847,6 @@ body {
             renderTable();
         });
 
-        window.addEventListener('keydown', (event) => {
-            const target = event.target;
-            const isEditing = target instanceof HTMLElement && (
-                target.isContentEditable ||
-                ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
-            );
-            const isSearchShortcut = event.key === '/' && !event.metaKey && !event.ctrlKey && !event.altKey;
-            const isCommandShortcut = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k';
-
-            if (!isEditing && (isSearchShortcut || isCommandShortcut)) {
-                event.preventDefault();
-                document.getElementById('search-input').focus();
-            }
-        });
-
         function loadFromLocalStorage() {
             const raw = localStorage.getItem(STORAGE_KEY);
             if (raw) {
@@ -1048,18 +1022,10 @@ body {
             }
         }
 
-        function clearSearch() {
-            const searchInput = document.getElementById('search-input');
-            searchInput.value = '';
-            renderTable();
-            searchInput.focus();
-        }
-
         function renderTable() {
             const tbody = document.getElementById('inventory-table-body');
             const emptyState = document.getElementById('empty-state');
-            const searchInput = document.getElementById('search-input');
-            const rawSearchQuery = searchInput.value.trim();
+            const rawSearchQuery = document.getElementById('search-input').value.trim();
             const searchQuery = rawSearchQuery.toLowerCase();
             const cleanSearchQuery = rawSearchQuery.replace(/[^0-9xX]/g, '').toLowerCase();
 
@@ -1114,12 +1080,6 @@ body {
 
                 return matchesSearch && matchesStatus && matchesLocation;
             });
-
-            const searchClearButton = document.getElementById('search-clear');
-            const searchShortcut = document.getElementById('search-shortcut');
-            searchClearButton.classList.toggle('hidden', !searchInput.value);
-            searchShortcut.classList.toggle('hidden', Boolean(searchInput.value));
-            document.getElementById('search-result-count').textContent = `${filteredBooks.length.toLocaleString()}件 / 全${booksData.length.toLocaleString()}件`;
 
             filteredBooks.sort((a, b) => {
                 const idANum = parseInt(String(a.ID).replace(/[^0-9]/g, ''), 10);
@@ -1773,10 +1733,10 @@ body {
             document.getElementById('scanner-modal').classList.remove('hidden');
 
             html5QrcodeScanner = new Html5Qrcode("reader");
-            const config = { fps: 10, qrbox: { width: 130, height: 60 } };
+            const config = { fps: 10, qrbox: { width: 250, height: 150 } };
 
             html5QrcodeScanner.start(
-                { facingMode: "environment" }, // ←ここを書き換えます
+                { facingMode: "environment" }, 
                 config, 
                 (decodedText) => {
                     html5QrcodeScanner.stop().then(() => {
