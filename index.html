@@ -204,8 +204,8 @@ body {
                         <input type="file" id="csv-file-input" accept=".csv" onchange="importCSV(event)" class="hidden">
                     </label>
                     <button onclick="saveToGoogleSheets()" class="bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-2 rounded-xl text-sm font-medium flex items-center space-x-2 transition shadow">
-                        <i class="fa-solid fa-cloud-arrow-up"></i>
-                        <span>スプレッドシートへ保存</span>
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                        <span>今すぐ同期</span>
                     </button>
                     <a href="report.html" class="bg-slate-800 hover:bg-slate-700 text-white px-3.5 py-2 rounded-xl text-sm font-medium flex items-center space-x-2 transition shadow">
                         <i class="fa-solid fa-chart-line"></i>
@@ -213,7 +213,10 @@ body {
                     </a>
                 </div>
             </div>
-            <p id="result-count" class="text-xs text-slate-500" aria-live="polite">0冊を表示（全0冊）</p>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <p id="result-count" class="text-xs text-slate-500" aria-live="polite">0冊を表示（全0冊）</p>
+                <p id="google-sync-status" class="text-xs text-slate-500" role="status" aria-live="polite">同期準備中</p>
+            </div>
         </section>
 
         <!-- 年別・月別 売上・原価・利益レポートセクション（アコーディオン対応） -->
@@ -701,6 +704,7 @@ body {
     <!-- JavaScript Logic -->
     <script>
         const STORAGE_KEY = 'book_inventory_excel_v6';
+        const SYNC_BASELINE_KEY = 'book_inventory_google_sync_baseline_v1';
 
         const EXACT_41_FIELDS = [
             "ID", "転記", "書名", "著者", "出版社", "ISBN", "ISC", "発行年", 
@@ -853,10 +857,19 @@ body {
         let html5QrcodeScanner = null;
         let idSortAscending = true;
         let missingSalesDateOnly = false;
+        let appReadyForSync = false;
+        let syncInProgress = false;
+        let syncRequestedAgain = false;
+        let syncDebounceTimer = null;
 
         window.addEventListener('DOMContentLoaded', () => {
             loadFromLocalStorage();
             renderTable();
+            appReadyForSync = true;
+            syncWithGoogleSheets();
+        });
+        window.addEventListener('focus', () => {
+            if (appReadyForSync && !syncInProgress) scheduleGoogleSheetsSync();
         });
 
         function loadFromLocalStorage() {
@@ -875,6 +888,7 @@ body {
 
         function saveToLocalStorage() {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(booksData));
+            if (appReadyForSync) scheduleGoogleSheetsSync();
         }
 
         function generateNextID() {
@@ -1073,17 +1087,19 @@ body {
                     conditionalProfitTotal += profit;
                 }
 
-                const cleanISBN = (book.ISBN || '').replace(/[^0-9xX]/g, '').toLowerCase();
-                const cleanISC = (book.ISC || '').replace(/[^0-9xX]/g, '').toLowerCase();
+                const isbn = String(book.ISBN || '');
+                const isc = String(book.ISC || '');
+                const cleanISBN = isbn.replace(/[^0-9xX]/g, '').toLowerCase();
+                const cleanISC = isc.replace(/[^0-9xX]/g, '').toLowerCase();
 
                 const matchesSearch = !searchQuery || 
                     (book.ID && String(book.ID).toLowerCase().includes(searchQuery)) ||
                     (book.書名 && book.書名.toLowerCase().includes(searchQuery)) ||
                     (book.著者 && book.著者.toLowerCase().includes(searchQuery)) ||
                     (book.出版社 && book.出版社.toLowerCase().includes(searchQuery)) ||
-                    (book.ISBN && book.ISBN.toLowerCase().includes(searchQuery)) ||
+                    (isbn && isbn.toLowerCase().includes(searchQuery)) ||
                     (cleanSearchQuery && cleanISBN.includes(cleanSearchQuery)) ||
-                    (book.ISC && book.ISC.toLowerCase().includes(searchQuery)) ||
+                    (isc && isc.toLowerCase().includes(searchQuery)) ||
                     (cleanSearchQuery && cleanISC.includes(cleanSearchQuery)) ||
                     (book.販売場所 && book.販売場所.toLowerCase().includes(searchQuery));
 
@@ -1602,8 +1618,8 @@ body {
             const cleanCode = scannedCode.replace(/[^0-9xX]/g, '');
 
             const existingIdx = booksData.findIndex(b => {
-                const bISBN = (b.ISBN || '').replace(/[^0-9xX]/g, '');
-                const bISC = (b.ISC || '').replace(/[^0-9xX]/g, '');
+                const bISBN = String(b.ISBN || '').replace(/[^0-9xX]/g, '');
+                const bISC = String(b.ISC || '').replace(/[^0-9xX]/g, '');
                 return bISBN === cleanCode || bISC === cleanCode;
             });
 
@@ -1755,8 +1771,10 @@ body {
             document.getElementById('barcode-book-price').innerText = `販売価格: ¥${Number(book.販売価格 || 0).toLocaleString()} (送料¥${Number(book.販売送料 || 0).toLocaleString()})`;
             document.getElementById('barcode-book-id').innerText = `ID: ${book.ID} / ISC: ${book.ISC || '-'}`;
 
-            const barcodeVal = (book.ISC && book.ISC.length === 13) ? book.ISC :
-                               ((book.ISBN && book.ISBN.length >= 10) ? book.ISBN : String(book.ID));
+            const isc = String(book.ISC || '');
+            const isbn = String(book.ISBN || '');
+            const barcodeVal = isc.length === 13 ? isc :
+                               (isbn.length >= 10 ? isbn : String(book.ID));
 
             try {
                 JsBarcode("#barcode-canvas", barcodeVal, {
@@ -2005,38 +2023,168 @@ body {
             }
         }
 
-        const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzxl0aAm58ndEYrPtJL5ttObpcy6ruSC90lJuZ4vfaxfaK8k4FK05eOE04uUoY9qqrSKg/exec";
+        const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwMe7Ww20mO4gnNeB5bLU-gAeL1coPTN0I6jnHCmlMkqfcMfELKv7Okpd5iHDZjOgHE2w/exec";
 
-        async function saveToGoogleSheets() {
-            if (booksData.length === 0) {
-                alert("送信するデータがありません。");
+        function scheduleGoogleSheetsSync() {
+            clearTimeout(syncDebounceTimer);
+            syncDebounceTimer = setTimeout(() => syncWithGoogleSheets(), 800);
+            setGoogleSheetsSyncStatus('変更を同期予定', 'text-amber-600');
+        }
+
+        function setGoogleSheetsSyncStatus(message, colorClass = 'text-slate-500') {
+            const status = document.getElementById('google-sync-status');
+            if (!status) return;
+            status.textContent = message;
+            status.className = `text-xs ${colorClass}`;
+        }
+
+        function getBookSyncRecord(book) {
+            const record = {};
+            EXACT_41_FIELDS.forEach(field => {
+                record[field] = book[field] === undefined || book[field] === null ? '' : book[field];
+            });
+            return record;
+        }
+
+        function sameBookForSync(left, right) {
+            return EXACT_41_FIELDS.every(field => String(left[field] ?? '') === String(right[field] ?? ''));
+        }
+
+        function postBookSyncRequest(payload) {
+            return new Promise((resolve, reject) => {
+                const requestId = `sync-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+                let activeScript = null;
+                let activeCallbackName = null;
+                let pollTimer = null;
+                let settled = false;
+
+                const cleanup = () => {
+                    clearTimeout(timeoutId);
+                    clearTimeout(pollTimer);
+                    if (activeCallbackName) delete window[activeCallbackName];
+                    if (activeScript) activeScript.remove();
+                };
+
+                const timeoutId = setTimeout(() => {
+                    finishWithError(new Error('Apps Scriptから同期結果が届きません。Code.gsの最新版をウェブアプリとして再デプロイし、アクセス権限を確認してください。'));
+                }, 60000);
+
+                const finishWithError = error => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    reject(error);
+                };
+
+                const pollForResult = () => {
+                    if (settled) return;
+                    activeCallbackName = `bookSyncResult_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+                    activeScript = document.createElement('script');
+                    activeScript.onerror = () => {
+                        finishWithError(new Error('Apps Scriptの同期結果を読み取れません。ウェブアプリURLとアクセス権限を確認してください。'));
+                    };
+
+                    window[activeCallbackName] = result => {
+                        if (activeScript) activeScript.remove();
+                        activeScript = null;
+                        delete window[activeCallbackName];
+                        activeCallbackName = null;
+
+                        if (result && result.protocol === 1) {
+                            finishWithError(new Error('Apps ScriptのCode.gsが古いバージョンです。同期対応版を反映し、新しいバージョンで再デプロイしてください。'));
+                            return;
+                        }
+                        if (result && result.pending) {
+                            pollTimer = setTimeout(pollForResult, 1000);
+                            return;
+                        }
+                        if (result && result.ok && Array.isArray(result.books)) {
+                            settled = true;
+                            cleanup();
+                            resolve(result);
+                            return;
+                        }
+                        finishWithError(new Error(
+                            result && result.error
+                                ? result.error
+                                : 'Apps Scriptから不正な同期応答が返されました。Code.gsのデプロイ内容を確認してください。'
+                        ));
+                    };
+
+                    activeScript.src = `${GAS_WEB_APP_URL}?requestId=${encodeURIComponent(requestId)}&callback=${encodeURIComponent(activeCallbackName)}&t=${Date.now()}`;
+                    document.head.appendChild(activeScript);
+                };
+
+                const body = new URLSearchParams({
+                    payload: JSON.stringify({ ...payload, requestId })
+                });
+                fetch(GAS_WEB_APP_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body
+                }).then(pollForResult).catch(finishWithError);
+            });
+        }
+
+        async function syncWithGoogleSheets() {
+            if (syncInProgress) {
+                syncRequestedAgain = true;
                 return;
             }
 
-            if (!confirm("現在の全データをGoogleスプレッドシートに同期（上書き/新規追加）しますか？")) {
-                return;
-            }
+            syncInProgress = true;
+            syncRequestedAgain = false;
+            setGoogleSheetsSyncStatus('スプレッドシートと同期中…', 'text-blue-600');
 
             try {
-                let successCount = 0;
-                
-                for (const book of booksData) {
-                    await fetch(GAS_WEB_APP_URL, {
-                        method: "POST",
-                        mode: "no-cors",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify(book)
-                    });
-                    successCount++;
+                const baselineRaw = localStorage.getItem(SYNC_BASELINE_KEY);
+                const baseline = baselineRaw ? JSON.parse(baselineRaw) : [];
+                if (!Array.isArray(baseline)) {
+                    throw new Error('同期履歴の形式が正しくありません。ブラウザーの保存データを確認してください。');
                 }
 
-                alert(`スプレッドシートへの同期が完了しました！（計 ${successCount} 件）`);
+                const submittedBooks = booksData.map(getBookSyncRecord);
+                const result = await postBookSyncRequest({
+                    books: submittedBooks,
+                    baseline: baseline.map(getBookSyncRecord)
+                });
+
+                const serverBooks = result.books.map(getBookSyncRecord);
+                const mergedBooks = new Map(serverBooks.map(book => [String(book.ID), book]));
+                const submittedById = new Map(submittedBooks.map(book => [String(book.ID), book]));
+                const currentById = new Map(booksData.map(book => [String(book.ID), getBookSyncRecord(book)]));
+                const changedIds = new Set([...submittedById.keys(), ...currentById.keys()]);
+
+                changedIds.forEach(id => {
+                    const submitted = submittedById.get(id);
+                    const current = currentById.get(id);
+                    const changedDuringSync = !submitted || !current || !sameBookForSync(submitted, current);
+                    if (!changedDuringSync) return;
+                    syncRequestedAgain = true;
+                    if (current) mergedBooks.set(id, current);
+                    else mergedBooks.delete(id);
+                });
+
+                booksData = Array.from(mergedBooks.values());
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(booksData));
+                localStorage.setItem(SYNC_BASELINE_KEY, JSON.stringify(serverBooks));
+                renderTable();
+                setGoogleSheetsSyncStatus(
+                    `同期済み ${new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} ・ ${booksData.length.toLocaleString()}件`,
+                    'text-emerald-700'
+                );
             } catch (error) {
-                console.error("送信エラー:", error);
-                alert("スプレッドシートへの保存に失敗しました。コンソールを確認してください。");
+                console.error('Googleスプレッドシート同期エラー:', error);
+                setGoogleSheetsSyncStatus(error.message || '同期に失敗しました。設定と接続を確認してください。', 'text-red-600');
+            } finally {
+                syncInProgress = false;
+                if (syncRequestedAgain) scheduleGoogleSheetsSync();
             }
+        }
+
+        function saveToGoogleSheets() {
+            clearTimeout(syncDebounceTimer);
+            syncWithGoogleSheets();
         }
     </script>
 </body>
