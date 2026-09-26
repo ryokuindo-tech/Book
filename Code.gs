@@ -13,7 +13,7 @@ const BOOK_FIELDS = [
 function doGet(event) {
   if (event.parameter.action === 'app') {
     return HtmlService.createHtmlOutputFromFile('Index')
-      .setTitle('書籍・在庫管理 Webシステム');
+      .setTitle('書籍管理システム');
   }
 
   const callback = String(event.parameter.callback || '');
