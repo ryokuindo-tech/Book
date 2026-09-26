@@ -1787,7 +1787,7 @@ body {
             document.getElementById('scanner-modal').classList.remove('hidden');
 
             html5QrcodeScanner = new Html5Qrcode("reader");
-            const config = { fps: 10, qrbox: { width: 250, height: 150 } };
+            const config = { fps: 10, qrbox: { width: 150, height: 80 } };
 
             html5QrcodeScanner.start(
                 { facingMode: "environment" }, 
